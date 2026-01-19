@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>语音字幕</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 字幕显示区域 */
+    .subtitle-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .subtitle-text {
+      font-size: 48px;
+      font-weight: bold;
+      line-height: 1.5;
+      max-width: 100%;
+      word-wrap: break-word;
+    }
+
+    /* 临时文字（正在说的）*/
+    .interim {
+      color: #888;
+    }
+
+    /* 控制区域 */
+    .control-area {
+      padding: 30px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      background: #111;
+    }
+
+    /* 开始按钮 */
+    .btn-start {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: none;
+      background: #e74c3c;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-start:hover {
+      transform: scale(1.05);
+    }
+
+    .btn-start.listening {
+      background: #27ae60;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
+      70% { box-shadow: 0 0 0 20px rgba(39, 174, 96, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+    }
+
+    /* 状态提示 */
+    .status {
+      font-size: 18px;
+      color: #888;
+    }
+
+    /* 字体大小控制 */
+    .font-control {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .btn-font {
+      width: 50px;
+      height: 50px;
+      border-radius: 10px;
+      border: 2px solid #444;
+      background: transparent;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+    }
+
+    .btn-font:hover {
+      background: #333;
+    }
+
+    /* 历史记录 */
+    .history {
+      max-height: 150px;
+      overflow-y: auto;
+      width: 100%;
+      max-width: 600px;
+      padding: 10px;
+      font-size: 16px;
+      color: #666;
+      text-align: center;
+    }
+
+    /* 错误提示 */
+    .error {
+      background: #e74c3c;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .error a {
+      color: white;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="subtitle-area" id="subtitleArea">
+    <div class="subtitle-text" id="subtitleText">
+      点击下方按钮开始
+    </div>
+  </div>
+
+  <div class="control-area">
+    <button class="btn-start" id="btnStart" onclick="toggleListening()">
+      开始
+    </button>
+    
+    <div class="status" id="status">准备就绪</div>
+    
+    <div class="font-control">
+      <button class="btn-font" onclick="changeFontSize(-8)">A-</button>
+      <span id="fontSizeDisplay">48px</span>
+      <button class="btn-font" onclick="changeFontSize(8)">A+</button>
+    </div>
+
+    <div class="history" id="history"></div>
+  </div>
+
+  <script>
+    // 检查浏览器支持
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      document.body.innerHTML = `
+        <div class="error">
+          <p>😔 您的浏览器不支持语音识别</p>
+          <p>请使用 Chrome 或 Edge 浏览器</p>
+        </div>
+      `;
+      throw new Error('Speech Recognition not supported');
+    }
+
+    // 初始化
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let isListening = false;
+    let finalTranscript = '';
+    let fontSize = 48;
+    const subtitleText = document.getElementById('subtitleText');
+    const btnStart = document.getElementById('btnStart');
+    const status = document.getElementById('status');
+    const history = document.getElementById('history');
+
+    // 语音识别结果
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        
+        if (event.results[i].isFinal) {
+          finalTranscript = transcript;
+          // 添加到历史
+          addToHistory(transcript);
+        } else {
+          interimTranscript = transcript;
+        }
+      }
+
+      // 显示字幕
+      if (interimTranscript) {
+        subtitleText.innerHTML = `<span class="interim">${interimTranscript}</span>`;
+      } else if (finalTranscript) {
+        subtitleText.textContent = finalTranscript;
+      }
+    };
+
+    // 错误处理
+    recognition.onerror = (event) => {
+      console.error('识别错误:', event.error);
+      
+      if (event.error === 'not-allowed') {
+        status.textContent = '❌ 请允许麦克风权限';
+      } else if (event.error === 'network') {
+        status.textContent = '❌ 网络错误，请检查网络';
+      } else {
+        status.textContent = `❌ 错误: ${event.error}`;
+      }
+    };
+
+    // 自动重启（保持持续监听）
+    recognition.onend = () => {
+      if (isListening) {
+        // 自动重连
+        setTimeout(() => {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.log('重启失败', e);
+          }
+        }, 100);
+      }
+    };
+
+    // 开始监听
+    recognition.onstart = () => {
+      status.textContent = '🎤 正在听...';
+    };
+
+    // 切换监听状态
+    function toggleListening() {
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    }
+
+    function startListening() {
+      try {
+        recognition.start();
+        isListening = true;
+        btnStart.textContent = '停止';
+        btnStart.classList.add('listening');
+        subtitleText.textContent = '正在听...';
+      } catch (e) {
+        console.error('启动失败:', e);
+      }
+    }
+
+    function stopListening() {
+      recognition.stop();
+      isListening = false;
+      btnStart.textContent = '开始';
+      btnStart.classList.remove('listening');
+      status.textContent = '已停止';
+    }
+
+    // 字体大小调节
+    function changeFontSize(delta) {
+      fontSize = Math.max(24, Math.min(96, fontSize + delta));
+      subtitleText.style.fontSize = fontSize + 'px';
+      document.getElementById('fontSizeDisplay').textContent = fontSize + 'px';
+    }
+
+    // 添加到历史记录
+    function addToHistory(text) {
+      const time = new Date().toLocaleTimeString('zh-CN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      const item = document.createElement('div');
+      item.textContent = `[${time}] ${text}`;
+      history.insertBefore(item, history.firstChild);
+      
+      // 只保留最近10条
+      while (history.children.length > 10) {
+        history.removeChild(history.lastChild);
+      }
+    }
+  </script>
+
+</body>
+</html>
