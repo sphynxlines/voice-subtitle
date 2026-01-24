@@ -20,7 +20,6 @@
       flex-direction: column;
     }
 
-    /* 字幕显示区域 */
     .subtitle-area {
       flex: 1;
       display: flex;
@@ -38,12 +37,10 @@
       word-wrap: break-word;
     }
 
-    /* 临时文字（正在说的）*/
-    .interim {
+    .recognizing {
       color: #888;
     }
 
-    /* 控制区域 */
     .control-area {
       padding: 30px 20px;
       display: flex;
@@ -53,7 +50,6 @@
       background: #111;
     }
 
-    /* 开始按钮 */
     .btn-start {
       width: 120px;
       height: 120px;
@@ -74,6 +70,12 @@
       transform: scale(1.05);
     }
 
+    .btn-start:disabled {
+      background: #666;
+      cursor: not-allowed;
+      transform: none;
+    }
+
     .btn-start.listening {
       background: #27ae60;
       animation: pulse 1.5s infinite;
@@ -85,13 +87,11 @@
       100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
     }
 
-    /* 状态提示 */
     .status {
       font-size: 18px;
       color: #888;
     }
 
-    /* 字体大小控制 */
     .font-control {
       display: flex;
       gap: 15px;
@@ -113,7 +113,6 @@
       background: #333;
     }
 
-    /* 历史记录 */
     .history {
       max-height: 150px;
       overflow-y: auto;
@@ -125,24 +124,16 @@
       text-align: center;
     }
 
-    /* 错误提示 */
     .error {
-      background: #e74c3c;
-      color: white;
+      color: #e74c3c;
       padding: 20px;
       text-align: center;
-      font-size: 18px;
-    }
-
-    .error a {
-      color: white;
-      text-decoration: underline;
     }
   </style>
 </head>
 <body>
 
-  <div class="subtitle-area" id="subtitleArea">
+  <div class="subtitle-area">
     <div class="subtitle-text" id="subtitleText">
       点击下方按钮开始
     </div>
@@ -164,117 +155,143 @@
     <div class="history" id="history"></div>
   </div>
 
+  <!-- Azure Speech SDK -->
+  <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+  
   <script>
-    // 检查浏览器支持
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-      document.body.innerHTML = `
-        <div class="error">
-          <p>😔 您的浏览器不支持语音识别</p>
-          <p>请使用 Chrome 或 Edge 浏览器</p>
-        </div>
-      `;
-      throw new Error('Speech Recognition not supported');
-    }
-
-    // 初始化
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'zh-CN';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
+    let recognizer = null;
     let isListening = false;
-    let finalTranscript = '';
     let fontSize = 48;
+    
     const subtitleText = document.getElementById('subtitleText');
     const btnStart = document.getElementById('btnStart');
     const status = document.getElementById('status');
     const history = document.getElementById('history');
 
-    // 语音识别结果
-    recognition.onresult = (event) => {
-      let interimTranscript = '';
-      
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        
-        if (event.results[i].isFinal) {
-          finalTranscript = transcript;
-          // 添加到历史
-          addToHistory(transcript);
-        } else {
-          interimTranscript = transcript;
+    // 获取 Azure Token
+    async function getToken() {
+      try {
+        const response = await fetch('/api/token');
+        if (!response.ok) {
+          throw new Error('Failed to get token');
         }
+        return await response.json();
+      } catch (error) {
+        console.error('Token error:', error);
+        throw error;
       }
+    }
 
-      // 显示字幕
-      if (interimTranscript) {
-        subtitleText.innerHTML = `<span class="interim">${interimTranscript}</span>`;
-      } else if (finalTranscript) {
-        subtitleText.textContent = finalTranscript;
-      }
-    };
-
-    // 错误处理
-    recognition.onerror = (event) => {
-      console.error('识别错误:', event.error);
+    // 初始化识别器
+    async function initRecognizer() {
+      status.textContent = '正在初始化...';
       
-      if (event.error === 'not-allowed') {
-        status.textContent = '❌ 请允许麦克风权限';
-      } else if (event.error === 'network') {
-        status.textContent = '❌ 网络错误，请检查网络';
-      } else {
-        status.textContent = `❌ 错误: ${event.error}`;
-      }
-    };
+      try {
+        const { token, region } = await getToken();
+        
+        const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
+        speechConfig.speechRecognitionLanguage = 'zh-CN';
+        
+        const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
 
-    // 自动重启（保持持续监听）
-    recognition.onend = () => {
-      if (isListening) {
-        // 自动重连
-        setTimeout(() => {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.log('重启失败', e);
+        // 实时识别（说话中）
+        recognizer.recognizing = (s, e) => {
+          if (e.result.reason === SpeechSDK.ResultReason.RecognizingSpeech) {
+            subtitleText.innerHTML = `<span class="recognizing">${e.result.text}</span>`;
           }
-        }, 100);
-      }
-    };
+        };
 
-    // 开始监听
-    recognition.onstart = () => {
-      status.textContent = '🎤 正在听...';
-    };
+        // 识别完成（一句话说完）
+        recognizer.recognized = (s, e) => {
+          if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+            subtitleText.textContent = e.result.text;
+            addToHistory(e.result.text);
+          } else if (e.result.reason === SpeechSDK.ResultReason.NoMatch) {
+            console.log('No speech recognized');
+          }
+        };
+
+        // 错误处理
+        recognizer.canceled = (s, e) => {
+          console.error('Canceled:', e.reason, e.errorDetails);
+          if (e.reason === SpeechSDK.CancellationReason.Error) {
+            status.textContent = '❌ 错误: ' + e.errorDetails;
+            stopListening();
+          }
+        };
+
+        // 会话结束
+        recognizer.sessionStopped = (s, e) => {
+          console.log('Session stopped');
+        };
+
+        return true;
+      } catch (error) {
+        status.textContent = '❌ 初始化失败: ' + error.message;
+        return false;
+      }
+    }
 
     // 切换监听状态
-    function toggleListening() {
+    async function toggleListening() {
       if (isListening) {
         stopListening();
       } else {
-        startListening();
+        await startListening();
       }
     }
 
-    function startListening() {
+    // 开始监听
+    async function startListening() {
+      btnStart.disabled = true;
+      
+      if (!recognizer) {
+        const success = await initRecognizer();
+        if (!success) {
+          btnStart.disabled = false;
+          return;
+        }
+      }
+
       try {
-        recognition.start();
-        isListening = true;
-        btnStart.textContent = '停止';
-        btnStart.classList.add('listening');
-        subtitleText.textContent = '正在听...';
-      } catch (e) {
-        console.error('启动失败:', e);
+        recognizer.startContinuousRecognitionAsync(
+          () => {
+            isListening = true;
+            btnStart.textContent = '停止';
+            btnStart.classList.add('listening');
+            btnStart.disabled = false;
+            status.textContent = '🎤 正在听...';
+            subtitleText.textContent = '正在听...';
+          },
+          (error) => {
+            console.error('Start error:', error);
+            status.textContent = '❌ 启动失败';
+            btnStart.disabled = false;
+          }
+        );
+      } catch (error) {
+        console.error('Start error:', error);
+        status.textContent = '❌ 启动失败';
+        btnStart.disabled = false;
       }
     }
 
+    // 停止监听
     function stopListening() {
-      recognition.stop();
-      isListening = false;
-      btnStart.textContent = '开始';
-      btnStart.classList.remove('listening');
-      status.textContent = '已停止';
+      if (recognizer) {
+        recognizer.stopContinuousRecognitionAsync(
+          () => {
+            isListening = false;
+            btnStart.textContent = '开始';
+            btnStart.classList.remove('listening');
+            status.textContent = '已停止';
+          },
+          (error) => {
+            console.error('Stop error:', error);
+          }
+        );
+      }
     }
 
     // 字体大小调节
@@ -286,6 +303,8 @@
 
     // 添加到历史记录
     function addToHistory(text) {
+      if (!text.trim()) return;
+      
       const time = new Date().toLocaleTimeString('zh-CN', { 
         hour: '2-digit', 
         minute: '2-digit' 
@@ -294,11 +313,20 @@
       item.textContent = `[${time}] ${text}`;
       history.insertBefore(item, history.firstChild);
       
-      // 只保留最近10条
       while (history.children.length > 10) {
         history.removeChild(history.lastChild);
       }
     }
+
+    // Token 过期刷新（每 9 分钟）
+    setInterval(async () => {
+      if (isListening && recognizer) {
+        console.log('Refreshing token...');
+        stopListening();
+        recognizer = null;
+        await startListening();
+      }
+    }, 9 * 60 * 1000);
   </script>
 
 </body>
