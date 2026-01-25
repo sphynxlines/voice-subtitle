@@ -27,6 +27,8 @@
       justify-content: center;
       padding: 40px 20px;
       text-align: center;
+      overflow: hidden; 
+      min-height: 0; 
     }
 
     .subtitle-text {
@@ -35,6 +37,8 @@
       line-height: 1.5;
       max-width: 100%;
       word-wrap: break-word;
+      max-height: 100%;
+      overflow-y: auto;
     }
 
     .recognizing {
@@ -48,6 +52,7 @@
       align-items: center;
       gap: 20px;
       background: #111;
+      flex-shrink: 0;
     }
 
     .btn-start {
