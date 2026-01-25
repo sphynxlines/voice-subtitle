@@ -163,176 +163,199 @@
   <!-- Azure Speech SDK -->
   <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
   
-  <script>
-    let recognizer = null;
-    let isListening = false;
-    let fontSize = 48;
+<script>
+  let conversationTranscriber = null;
+  let isListening = false;
+  let fontSize = 48;
+  
+  const subtitleText = document.getElementById('subtitleText');
+  const btnStart = document.getElementById('btnStart');
+  const status = document.getElementById('status');
+  const history = document.getElementById('history');
+
+  // 说话者映射（Guest-1 → A, Guest-2 → B）
+  const speakerMap = {};
+  let speakerCount = 0;
+  const speakerLabels = ['A', 'B', 'C', 'D', 'E'];
+
+  function getSpeakerLabel(speakerId) {
+    if (!speakerMap[speakerId]) {
+      speakerMap[speakerId] = speakerLabels[speakerCount] || `说话者${speakerCount + 1}`;
+      speakerCount++;
+    }
+    return speakerMap[speakerId];
+  }
+
+  // 获取 Azure Token
+  async function getToken() {
+    try {
+      const response = await fetch('/api/token');
+      if (!response.ok) {
+        throw new Error('Failed to get token');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Token error:', error);
+      throw error;
+    }
+  }
+
+  // 初始化 Conversation Transcriber
+  async function initTranscriber() {
+    status.textContent = '正在初始化...';
     
-    const subtitleText = document.getElementById('subtitleText');
-    const btnStart = document.getElementById('btnStart');
-    const status = document.getElementById('status');
-    const history = document.getElementById('history');
-
-    // 获取 Azure Token
-    async function getToken() {
-      try {
-        const response = await fetch('/api/token');
-        if (!response.ok) {
-          throw new Error('Failed to get token');
-        }
-        return await response.json();
-      } catch (error) {
-        console.error('Token error:', error);
-        throw error;
-      }
-    }
-
-    // 初始化识别器
-    async function initRecognizer() {
-      status.textContent = '正在初始化...';
+    try {
+      const { token, region } = await getToken();
       
-      try {
-        const { token, region } = await getToken();
-        
-        const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
-        speechConfig.speechRecognitionLanguage = 'zh-CN';
-        
-        const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-        recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
-
-        // 实时识别（说话中）
-        recognizer.recognizing = (s, e) => {
-          if (e.result.reason === SpeechSDK.ResultReason.RecognizingSpeech) {
-            subtitleText.innerHTML = `<span class="recognizing">${e.result.text}</span>`;
-          }
-        };
-
-        // 识别完成（一句话说完）
-        recognizer.recognized = (s, e) => {
-          if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-            subtitleText.textContent = e.result.text;
-            addToHistory(e.result.text);
-          } else if (e.result.reason === SpeechSDK.ResultReason.NoMatch) {
-            console.log('No speech recognized');
-          }
-        };
-
-        // 错误处理
-        recognizer.canceled = (s, e) => {
-          console.error('Canceled:', e.reason, e.errorDetails);
-          if (e.reason === SpeechSDK.CancellationReason.Error) {
-            status.textContent = '❌ 错误: ' + e.errorDetails;
-            stopListening();
-          }
-        };
-
-        // 会话结束
-        recognizer.sessionStopped = (s, e) => {
-          console.log('Session stopped');
-        };
-
-        return true;
-      } catch (error) {
-        status.textContent = '❌ 初始化失败: ' + error.message;
-        return false;
-      }
-    }
-
-    // 切换监听状态
-    async function toggleListening() {
-      if (isListening) {
-        stopListening();
-      } else {
-        await startListening();
-      }
-    }
-
-    // 开始监听
-    async function startListening() {
-      btnStart.disabled = true;
+      const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
+      speechConfig.speechRecognitionLanguage = 'zh-CN';
       
-      if (!recognizer) {
-        const success = await initRecognizer();
-        if (!success) {
-          btnStart.disabled = false;
-          return;
-        }
-      }
+      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      
+      conversationTranscriber = new SpeechSDK.ConversationTranscriber(speechConfig, audioConfig);
 
-      try {
-        recognizer.startContinuousRecognitionAsync(
-          () => {
-            isListening = true;
-            btnStart.textContent = '停止';
-            btnStart.classList.add('listening');
-            btnStart.disabled = false;
-            status.textContent = '🎤 正在听...';
-            subtitleText.textContent = '正在听...';
-          },
-          (error) => {
-            console.error('Start error:', error);
-            status.textContent = '❌ 启动失败';
-            btnStart.disabled = false;
-          }
-        );
-      } catch (error) {
-        console.error('Start error:', error);
-        status.textContent = '❌ 启动失败';
+      // 实时识别（说话中）
+      conversationTranscriber.transcribing = (s, e) => {
+        if (e.result.text) {
+          const speaker = e.result.speakerId ? getSpeakerLabel(e.result.speakerId) : '?';
+          subtitleText.innerHTML = `<span class="recognizing">${speaker}: ${e.result.text}</span>`;
+        }
+      };
+
+      // 识别完成（一句话说完）
+      conversationTranscriber.transcribed = (s, e) => {
+        if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+          const speaker = e.result.speakerId ? getSpeakerLabel(e.result.speakerId) : '?';
+          const line = `${speaker}: ${e.result.text}`;
+          subtitleText.textContent = line;
+          addToHistory(line);
+        }
+      };
+
+      // 错误处理
+      conversationTranscriber.canceled = (s, e) => {
+        console.error('Canceled:', e.reason, e.errorDetails);
+        if (e.reason === SpeechSDK.CancellationReason.Error) {
+          status.textContent = '❌ 错误: ' + e.errorDetails;
+          stopListening();
+        }
+      };
+
+      conversationTranscriber.sessionStarted = (s, e) => {
+        console.log('Session started');
+      };
+
+      conversationTranscriber.sessionStopped = (s, e) => {
+        console.log('Session stopped');
+      };
+
+      return true;
+    } catch (error) {
+      console.error('Init error:', error);
+      status.textContent = '❌ 初始化失败: ' + error.message;
+      return false;
+    }
+  }
+
+  // 切换监听状态
+  async function toggleListening() {
+    if (isListening) {
+      stopListening();
+    } else {
+      await startListening();
+    }
+  }
+
+  // 开始监听
+  async function startListening() {
+    btnStart.disabled = true;
+    
+    // 重置说话者映射
+    Object.keys(speakerMap).forEach(key => delete speakerMap[key]);
+    speakerCount = 0;
+
+    if (!conversationTranscriber) {
+      const success = await initTranscriber();
+      if (!success) {
         btnStart.disabled = false;
+        return;
       }
     }
 
-    // 停止监听
-    function stopListening() {
-      if (recognizer) {
-        recognizer.stopContinuousRecognitionAsync(
-          () => {
-            isListening = false;
-            btnStart.textContent = '开始';
-            btnStart.classList.remove('listening');
-            status.textContent = '已停止';
-          },
-          (error) => {
-            console.error('Stop error:', error);
-          }
-        );
-      }
+    try {
+      conversationTranscriber.startTranscribingAsync(
+        () => {
+          isListening = true;
+          btnStart.textContent = '停止';
+          btnStart.classList.add('listening');
+          btnStart.disabled = false;
+          status.textContent = '🎤 正在听...';
+          subtitleText.textContent = '正在听...';
+        },
+        (error) => {
+          console.error('Start error:', error);
+          status.textContent = '❌ 启动失败: ' + error;
+          btnStart.disabled = false;
+        }
+      );
+    } catch (error) {
+      console.error('Start error:', error);
+      status.textContent = '❌ 启动失败';
+      btnStart.disabled = false;
     }
+  }
 
-    // 字体大小调节
-    function changeFontSize(delta) {
-      fontSize = Math.max(24, Math.min(96, fontSize + delta));
-      subtitleText.style.fontSize = fontSize + 'px';
-      document.getElementById('fontSizeDisplay').textContent = fontSize + 'px';
+  // 停止监听
+  function stopListening() {
+    if (conversationTranscriber) {
+      conversationTranscriber.stopTranscribingAsync(
+        () => {
+          isListening = false;
+          btnStart.textContent = '开始';
+          btnStart.classList.remove('listening');
+          status.textContent = '已停止';
+        },
+        (error) => {
+          console.error('Stop error:', error);
+        }
+      );
     }
+  }
 
-    // 添加到历史记录
-    function addToHistory(text) {
-      if (!text.trim()) return;
-      
-      const time = new Date().toLocaleTimeString('zh-CN', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-      const item = document.createElement('div');
-      item.textContent = `[${time}] ${text}`;
-      history.insertBefore(item, history.firstChild);
-      
-      while (history.children.length > 10) {
-        history.removeChild(history.lastChild);
-      }
+  // 字体大小调节
+  function changeFontSize(delta) {
+    fontSize = Math.max(24, Math.min(96, fontSize + delta));
+    subtitleText.style.fontSize = fontSize + 'px';
+    document.getElementById('fontSizeDisplay').textContent = fontSize + 'px';
+  }
+
+  // 添加到历史记录
+  function addToHistory(text) {
+    if (!text.trim()) return;
+    
+    const time = new Date().toLocaleTimeString('zh-CN', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    const item = document.createElement('div');
+    item.textContent = `[${time}] ${text}`;
+    history.insertBefore(item, history.firstChild);
+    
+    while (history.children.length > 10) {
+      history.removeChild(history.lastChild);
     }
+  }
 
-    // Token 过期刷新（每 9 分钟）
-    setInterval(async () => {
-      if (isListening && recognizer) {
-        console.log('Refreshing token...');
-        stopListening();
-        recognizer = null;
-        await startListening();
-      }
-    }, 9 * 60 * 1000);
-  </script>
+  // Token 过期刷新（每 9 分钟）
+  setInterval(async () => {
+    if (isListening && conversationTranscriber) {
+      console.log('Refreshing token...');
+      stopListening();
+      conversationTranscriber = null;
+      await startListening();
+    }
+  }, 9 * 60 * 1000);
+</script>
 
 </body>
 </html>
