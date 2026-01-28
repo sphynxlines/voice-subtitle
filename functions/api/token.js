@@ -5,16 +5,14 @@ const ALLOWED_DOMAINS = [
   '127.0.0.1'
 ];
 
-// 简单的速率限制
 const rateLimitMap = new Map();
-const RATE_LIMIT_PER_MINUTE = 30;  // 每分钟 30 次，非常宽松
+const RATE_LIMIT_PER_MINUTE = 30;
 const RATE_WINDOW = 60 * 1000;
 
 function checkRateLimit(ip) {
   const now = Date.now();
   const record = rateLimitMap.get(ip);
   
-  // 清理旧记录（防止内存泄漏）
   if (rateLimitMap.size > 10000) {
     rateLimitMap.clear();
   }
@@ -36,22 +34,62 @@ function checkReferer(request) {
   const referer = request.headers.get('Referer') || '';
   const origin = request.headers.get('Origin') || '';
   
-  // 如果没有 referer/origin（直接访问），允许（方便测试）
   if (!referer && !origin) {
     return true;
   }
   
-  // 检查是否来自允许的域名
   return ALLOWED_DOMAINS.some(domain => 
     referer.includes(domain) || origin.includes(domain)
   );
+}
+
+// 记录使用统计
+async function recordUsage(env, ip) {
+  if (!env.STATS) return;
+  
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const month = today.substring(0, 7);
+    
+    // 今日统计
+    const dailyKey = `daily:${today}`;
+    const dailyCount = parseInt(await env.STATS.get(dailyKey)) || 0;
+    await env.STATS.put(dailyKey, (dailyCount + 1).toString(), {
+      expirationTtl: 90 * 86400  // 保留 90 天
+    });
+    
+    // 本月统计
+    const monthlyKey = `monthly:${month}`;
+    const monthlyCount = parseInt(await env.STATS.get(monthlyKey)) || 0;
+    await env.STATS.put(monthlyKey, (monthlyCount + 1).toString(), {
+      expirationTtl: 365 * 86400  // 保留 1 年
+    });
+    
+    // 总计
+    const totalCount = parseInt(await env.STATS.get('total')) || 0;
+    await env.STATS.put('total', (totalCount + 1).toString());
+    
+    // 独立 IP 统计（今日）
+    const ipKey = `ip:${today}:${ip}`;
+    const isNewIp = !(await env.STATS.get(ipKey));
+    if (isNewIp) {
+      await env.STATS.put(ipKey, '1', { expirationTtl: 86400 });
+      
+      const uniqueKey = `unique:${today}`;
+      const uniqueCount = parseInt(await env.STATS.get(uniqueKey)) || 0;
+      await env.STATS.put(uniqueKey, (uniqueCount + 1).toString(), {
+        expirationTtl: 90 * 86400
+      });
+    }
+  } catch (e) {
+    console.error('Stats error:', e);
+  }
 }
 
 export async function onRequestGet(context) {
   const request = context.request;
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
-  // 1. Referrer 检查
   if (!checkReferer(request)) {
     return new Response(
       JSON.stringify({ error: 'Unauthorized' }),
@@ -62,7 +100,6 @@ export async function onRequestGet(context) {
     );
   }
 
-  // 2. 速率限制检查
   if (!checkRateLimit(ip)) {
     return new Response(
       JSON.stringify({ error: '请求过于频繁，请稍后再试' }),
@@ -73,7 +110,9 @@ export async function onRequestGet(context) {
     );
   }
 
-  // 3. 获取 Azure Token
+  // 记录使用统计
+  await recordUsage(context.env, ip);
+
   const AZURE_KEY = context.env.AZURE_KEY;
   const AZURE_REGION = context.env.AZURE_REGION;
 
