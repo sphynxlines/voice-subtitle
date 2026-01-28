@@ -127,6 +127,25 @@
       align-items: center;
     }
 
+    .help-link {
+      width: 50px;
+      height: 50px;
+      border-radius: 10px;
+      border: 2px solid #555;
+      background: transparent;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+
+    .help-link:hover {
+      background: #333;
+    }
+    
     .btn-font {
       width: 50px;
       height: 50px;
@@ -184,6 +203,7 @@
       <button class="btn-font" onclick="changeFontSize(-8)">A-</button>
       <span id="fontSizeDisplay">48px</span>
       <button class="btn-font" onclick="changeFontSize(8)">A+</button>
+      <a href="/help.html" class="help-link" title="帮助">?</a>
     </div>
 
     <div class="history" id="history"></div>

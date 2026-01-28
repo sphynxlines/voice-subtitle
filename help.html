@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>帮助 - 语音字幕</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #000;
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+      line-height: 1.8;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .back-link {
+      display: inline-block;
+      color: #27ae60;
+      text-decoration: none;
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 30px;
+    }
+
+    .section {
+      background: #111;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .section h2 {
+      font-size: 20px;
+      margin-bottom: 15px;
+      color: #27ae60;
+    }
+
+    .steps {
+      font-size: 18px;
+    }
+
+    .steps li {
+      margin-bottom: 12px;
+      padding-left: 10px;
+    }
+
+    .device-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .device-tab {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 2px solid #333;
+      background: transparent;
+      color: #888;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .device-tab.active {
+      border-color: #27ae60;
+      color: #fff;
+      background: #1a3d2a;
+    }
+
+    .device-content {
+      display: none;
+    }
+
+    .device-content.active {
+      display: block;
+    }
+
+    .icon {
+      font-size: 24px;
+      margin-right: 8px;
+    }
+
+    .tip {
+      background: #1a3d2a;
+      border-left: 4px solid #27ae60;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .faq-item {
+      margin-bottom: 20px;
+    }
+
+    .faq-q {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .faq-a {
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <a href="/" class="back-link">← 返回</a>
+    
+    <h1>📖 使用帮助</h1>
+
+    <!-- 基本使用 -->
+    <div class="section">
+      <h2><span class="icon">🎤</span>如何使用</h2>
+      <ol class="steps">
+        <li>点击绿色的「开始」按钮</li>
+        <li>第一次使用会询问麦克风权限，点击「允许」</li>
+        <li>对着手机说话，文字会显示在屏幕上</li>
+        <li>点击红色的「停止」按钮结束</li>
+      </ol>
+    </div>
+
+    <!-- 添加到主屏幕 -->
+    <div class="section">
+      <h2><span class="icon">📱</span>添加到主屏幕</h2>
+      <p style="margin-bottom: 15px; color: #aaa;">添加后可以像普通 App 一样使用</p>
+      
+      <div class="device-tabs">
+        <button class="device-tab active" onclick="showDevice('android')">安卓手机</button>
+        <button class="device-tab" onclick="showDevice('iphone')">苹果手机</button>
+      </div>
+
+      <div id="android" class="device-content active">
+        <ol class="steps">
+          <li>用 Chrome 浏览器打开本页面</li>
+          <li>点击右上角菜单 <strong>⋮</strong></li>
+          <li>选择「添加到主屏幕」或「安装应用」</li>
+          <li>点击「添加」</li>
+          <li>桌面会出现「语音字幕」图标</li>
+        </ol>
+      </div>
+
+      <div id="iphone" class="device-content">
+        <ol class="steps">
+          <li>用 <strong>Safari</strong> 浏览器打开（不是 Chrome）</li>
+          <li>点击底部的分享按钮 <strong>⬆️</strong></li>
+          <li>向上滑动，找到「添加到主屏幕」</li>
+          <li>点击右上角「添加」</li>
+          <li>桌面会出现「语音字幕」图标</li>
+        </ol>
+        <div class="tip">
+          ⚠️ 苹果手机必须用 Safari 浏览器，用 Chrome 或微信打开无法添加
+        </div>
+      </div>
+    </div>
+
+    <!-- 麦克风权限 -->
+    <div class="section">
+      <h2><span class="icon">🔐</span>麦克风权限</h2>
+      <p style="margin-bottom: 15px; color: #aaa;">如果不小心拒绝了权限，可以这样恢复：</p>
+      
+      <div class="device-tabs">
+        <button class="device-tab active" onclick="showDevice2('android2')">安卓手机</button>
+        <button class="device-tab" onclick="showDevice2('iphone2')">苹果手机</button>
+      </div>
+
+      <div id="android2" class="device-content active">
+        <ol class="steps">
+          <li>打开手机「设置」</li>
+          <li>找到「应用管理」或「应用」</li>
+          <li>找到「Chrome」或「语音字幕」</li>
+          <li>点击「权限」</li>
+          <li>找到「麦克风」，选择「允许」</li>
+        </ol>
+      </div>
+
+      <div id="iphone2" class="device-content">
+        <ol class="steps">
+          <li>打开手机「设置」</li>
+          <li>向下滑动找到「Safari」</li>
+          <li>点击「麦克风」</li>
+          <li>选择「允许」</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- 常见问题 -->
+    <div class="section">
+      <h2><span class="icon">❓</span>常见问题</h2>
+      
+      <div class="faq-item">
+        <div class="faq-q">没有声音 / 不显示文字？</div>
+        <div class="faq-a">请检查是否允许了麦克风权限，并确保网络连接正常。</div>
+      </div>
+      
+      <div class="faq-item">
+        <div class="faq-q">识别不准确？</div>
+        <div class="faq-a">尽量在安静的环境使用，说话清晰一些，手机放近一点。</div>
+      </div>
+      
+      <div class="faq-item">
+        <div class="faq-q">屏幕会变暗？</div>
+        <div class="faq-a">正在录音时屏幕会保持常亮。如果还是变暗，可以在手机设置里延长屏幕自动锁定时间。</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">显示「网络已断开」？</div>
+        <div class="faq-a">请检查手机是否连接了 WiFi 或移动数据。</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function showDevice(device) {
+      document.querySelectorAll('#android, #iphone').forEach(el => {
+        el.classList.remove('active');
+      });
+      document.getElementById(device).classList.add('active');
+      
+      // 更新 tab 样式
+      const tabs = document.querySelectorAll('.device-tabs')[0].querySelectorAll('.device-tab');
+      tabs.forEach(tab => tab.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+
+    function showDevice2(device) {
+      document.querySelectorAll('#android2, #iphone2').forEach(el => {
+        el.classList.remove('active');
+      });
+      document.getElementById(device).classList.add('active');
+      
+      // 更新 tab 样式
+      const tabs = document.querySelectorAll('.device-tabs')[1].querySelectorAll('.device-tab');
+      tabs.forEach(tab => tab.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+  </script>
+
+</body>
+</html>
