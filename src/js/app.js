@@ -142,6 +142,7 @@ export class App {
       this.isListening = false;
       this.ui.updateButton(false);
       this.ui.updateStatus('已停止');
+      this.ui.updateSubtitle('', '点击下方按钮开始');
       
       // Release wake lock
       await this.wakeLock.release();
