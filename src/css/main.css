@@ -117,6 +117,46 @@ body {
 .status {
   font-size: 18px;
   color: #aaa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Connection Indicator */
+.connection-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #666;
+  display: inline-block;
+}
+
+.connection-indicator.connected {
+  background: #27ae60;
+  animation: pulse-green 2s infinite;
+}
+
+.connection-indicator.reconnecting {
+  background: #f39c12;
+  animation: pulse-orange 1s infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes pulse-orange {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 /* Font Controls */

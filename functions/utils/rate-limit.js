@@ -2,7 +2,7 @@
  * Rate Limiting Utilities using Cloudflare KV
  */
 
-const RATE_LIMIT_PER_MINUTE = 30;
+const RATE_LIMIT_PER_MINUTE = 60; // Increased to 60 for long sessions
 const RATE_WINDOW = 60; // seconds
 
 /**

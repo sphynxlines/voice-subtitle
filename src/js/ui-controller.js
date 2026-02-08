@@ -11,13 +11,16 @@ export class UIController {
     this.elements = {
       subtitleText: document.getElementById('subtitleText'),
       btnStart: document.getElementById('btnStart'),
-      status: document.getElementById('status'),
+      statusText: document.getElementById('statusText'),
+      connectionIndicator: document.getElementById('connectionIndicator'),
       history: document.getElementById('history'),
       networkStatus: document.getElementById('networkStatus'),
       fontSizeDisplay: document.getElementById('fontSizeDisplay')
     };
     
     this.fontSize = storage.get(CONFIG.STORAGE_KEYS.FONT_SIZE, CONFIG.FONT_SIZE.DEFAULT);
+    this.sessionStartTime = null;
+    this.sessionDurationTimer = null;
     this.applyFontSize();
   }
 
@@ -54,14 +57,65 @@ export class UIController {
     
     const message = ERROR_MESSAGES[error.type] || ERROR_MESSAGES.unknown;
     this.elements.subtitleText.textContent = message;
-    this.elements.status.textContent = '❌ ' + error.message;
+    this.elements.statusText.textContent = '❌ ' + error.message;
+    this.updateConnectionStatus('disconnected');
   }
 
   /**
    * Update status text
    */
   updateStatus(text) {
-    this.elements.status.textContent = text;
+    this.elements.statusText.textContent = text;
+  }
+  
+  /**
+   * Update connection status indicator
+   */
+  updateConnectionStatus(state) {
+    this.elements.connectionIndicator.className = 'connection-indicator';
+    if (state === 'connected') {
+      this.elements.connectionIndicator.classList.add('connected');
+    } else if (state === 'reconnecting') {
+      this.elements.connectionIndicator.classList.add('reconnecting');
+    }
+  }
+  
+  /**
+   * Update session duration display
+   */
+  updateSessionDuration() {
+    if (!this.sessionStartTime) return;
+    
+    const duration = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    
+    if (minutes > 0) {
+      this.elements.statusText.textContent = 
+        `🎤 正在听... (${minutes}:${seconds.toString().padStart(2, '0')})`;
+    }
+  }
+  
+  /**
+   * Start session duration timer
+   */
+  startSessionDurationTimer() {
+    this.sessionStartTime = Date.now();
+    if (this.sessionDurationTimer) {
+      clearInterval(this.sessionDurationTimer);
+    }
+    this.sessionDurationTimer = setInterval(() => this.updateSessionDuration(), 1000);
+  }
+  
+  /**
+   * Stop session duration timer
+   */
+  stopSessionDurationTimer() {
+    if (this.sessionDurationTimer) {
+      clearInterval(this.sessionDurationTimer);
+      this.sessionDurationTimer = null;
+    }
+    this.sessionStartTime = null;
   }
 
   /**

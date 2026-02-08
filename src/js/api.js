@@ -15,9 +15,12 @@ export class SpeechAPI {
   }
 
   /**
-   * Get Azure Speech token
+   * Get Azure Speech token with retry logic
    */
-  async getToken() {
+  async getToken(retryCount = 0) {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000; // 1 second
+    
     if (!isOnline()) {
       throw new NetworkError();
     }
@@ -26,6 +29,12 @@ export class SpeechAPI {
       const response = await fetch(CONFIG.API.TOKEN);
       
       if (!response.ok) {
+        // Handle rate limiting with retry
+        if (response.status === 429 && retryCount < MAX_RETRIES) {
+          console.log(`Rate limited, retrying in ${RETRY_DELAY * (retryCount + 1)}ms...`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+          return this.getToken(retryCount + 1);
+        }
         throw new TokenError();
       }
       
@@ -38,6 +47,12 @@ export class SpeechAPI {
       return data;
     } catch (error) {
       if (error instanceof NetworkError || error instanceof TokenError) {
+        // Retry on non-network errors
+        if (!(error instanceof NetworkError) && retryCount < MAX_RETRIES) {
+          console.log(`Retrying token fetch... (${retryCount + 1}/${MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+          return this.getToken(retryCount + 1);
+        }
         throw error;
       }
       console.error('Token fetch error:', error);
