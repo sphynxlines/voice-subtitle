@@ -25,9 +25,14 @@ export class UIController {
    * Update subtitle text
    */
   updateSubtitle(speaker, text, isRecognizing = false) {
+    console.log('updateSubtitle called:', { speaker, text, isRecognizing });
+    
     if (!text) {
       // If no text provided, clear subtitle
-      this.elements.subtitleText.textContent = speaker || '点击下方按钮开始';
+      const newText = speaker || '点击下方按钮开始';
+      console.log('Setting subtitle to:', newText);
+      this.elements.subtitleText.textContent = newText;
+      console.log('Subtitle element textContent is now:', this.elements.subtitleText.textContent);
       return;
     }
     

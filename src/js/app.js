@@ -30,19 +30,25 @@ export class App {
   setupEventHandlers() {
     // Real-time transcription
     this.speechService.onTranscribing = (speaker, text, isRecognizing) => {
+      console.log('onTranscribing fired:', { speaker, text, isListening: this.isListening });
       // Only update if still listening
       if (this.isListening) {
         this.ui.updateSubtitle(speaker, text, isRecognizing);
+      } else {
+        console.log('Ignoring transcribing event - not listening');
       }
     };
 
     // Final transcription
     this.speechService.onTranscribed = (speaker, text, isRecognizing) => {
+      console.log('onTranscribed fired:', { speaker, text, isListening: this.isListening });
       // Only update if still listening
       if (this.isListening) {
         const line = `${speaker}: ${text}`;
         this.ui.updateSubtitle(speaker, text, isRecognizing);
         this.ui.addToHistory(line);
+      } else {
+        console.log('Ignoring transcribed event - not listening');
       }
     };
 
@@ -142,21 +148,32 @@ export class App {
    * Stop listening
    */
   async stop() {
+    console.log('=== STOP CALLED ===');
     try {
       // Set flag first to prevent event handlers from updating UI
       this.isListening = false;
+      console.log('isListening set to false');
       
       await this.speechService.stop();
+      console.log('speechService.stop() completed');
       
       this.ui.updateButton(false);
-      this.ui.updateStatus('已停止');
+      console.log('Button updated');
       
-      // Clear subtitle and show default message
-      // Use setTimeout to ensure this happens after any pending events
+      this.ui.updateStatus('已停止');
+      console.log('Status updated');
+      
+      // Clear subtitle and show default message immediately
+      console.log('About to reset subtitle...');
+      this.ui.updateSubtitle('点击下方按钮开始', '');
+      console.log('Subtitle reset completed');
+      
+      // Also try with a delay to see if something overwrites it
       setTimeout(() => {
+        console.log('Delayed subtitle reset...');
         this.ui.updateSubtitle('点击下方按钮开始', '');
-        console.log('Subtitle reset to default');
-      }, 100);
+        console.log('Delayed subtitle reset completed');
+      }, 200);
       
       // Release wake lock
       await this.wakeLock.release();
