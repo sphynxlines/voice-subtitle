@@ -25,6 +25,12 @@ export class UIController {
    * Update subtitle text
    */
   updateSubtitle(speaker, text, isRecognizing = false) {
+    if (!text) {
+      // If no text provided, clear subtitle
+      this.elements.subtitleText.textContent = speaker || '点击下方按钮开始';
+      return;
+    }
+    
     const displayText = speaker ? `${speaker}: ${text}` : text;
     
     if (isRecognizing) {
