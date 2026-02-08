@@ -30,14 +30,20 @@ export class App {
   setupEventHandlers() {
     // Real-time transcription
     this.speechService.onTranscribing = (speaker, text, isRecognizing) => {
-      this.ui.updateSubtitle(speaker, text, isRecognizing);
+      // Only update if still listening
+      if (this.isListening) {
+        this.ui.updateSubtitle(speaker, text, isRecognizing);
+      }
     };
 
     // Final transcription
     this.speechService.onTranscribed = (speaker, text, isRecognizing) => {
-      const line = `${speaker}: ${text}`;
-      this.ui.updateSubtitle(speaker, text, isRecognizing);
-      this.ui.addToHistory(line);
+      // Only update if still listening
+      if (this.isListening) {
+        const line = `${speaker}: ${text}`;
+        this.ui.updateSubtitle(speaker, text, isRecognizing);
+        this.ui.addToHistory(line);
+      }
     };
 
     // Error handling
@@ -137,13 +143,20 @@ export class App {
    */
   async stop() {
     try {
+      // Set flag first to prevent event handlers from updating UI
+      this.isListening = false;
+      
       await this.speechService.stop();
       
-      this.isListening = false;
       this.ui.updateButton(false);
       this.ui.updateStatus('已停止');
+      
       // Clear subtitle and show default message
-      this.ui.updateSubtitle('点击下方按钮开始', '');
+      // Use setTimeout to ensure this happens after any pending events
+      setTimeout(() => {
+        this.ui.updateSubtitle('点击下方按钮开始', '');
+        console.log('Subtitle reset to default');
+      }, 100);
       
       // Release wake lock
       await this.wakeLock.release();
