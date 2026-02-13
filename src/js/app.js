@@ -94,6 +94,30 @@ export class App {
         await this.wakeLock.request();
       }
     });
+    
+    // Setup help modal handlers
+    this.setupHelpModal();
+  }
+  
+  /**
+   * Setup help modal event handlers
+   */
+  setupHelpModal() {
+    const modal = document.getElementById('helpModal');
+    
+    // Close on ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('active')) {
+        this.toggleHelp();
+      }
+    });
+    
+    // Close on click outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.toggleHelp();
+      }
+    });
   }
 
   /**
@@ -191,21 +215,25 @@ export class App {
   }
   
   /**
-   * Open help page (works in both browser and PWA mode)
+   * Toggle help modal
    */
-  openHelp() {
+  toggleHelp() {
     vibrate();
     
-    // Check if running as PWA
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
-                  window.navigator.standalone === true;
+    const modal = document.getElementById('helpModal');
+    const iframe = document.getElementById('helpFrame');
+    const body = document.body;
     
-    if (isPWA) {
-      // In PWA mode, open in new window/tab
-      window.open('/help.html', '_blank', 'noopener,noreferrer');
+    if (modal.classList.contains('active')) {
+      // Close modal
+      modal.classList.remove('active');
+      body.classList.remove('modal-open');
+      iframe.src = ''; // Clear iframe to stop any activity
     } else {
-      // In browser mode, navigate normally
-      window.location.href = '/help.html';
+      // Open modal
+      iframe.src = '/help.html';
+      modal.classList.add('active');
+      body.classList.add('modal-open');
     }
   }
 

@@ -46,10 +46,18 @@
       <button class="btn-font" onclick="window.app.changeFontSize(-8)" aria-label="减小字体">A-</button>
       <span id="fontSizeDisplay" aria-label="当前字体大小">48px</span>
       <button class="btn-font" onclick="window.app.changeFontSize(8)" aria-label="增大字体">A+</button>
-      <button class="help-link" onclick="window.app.openHelp()" title="帮助" aria-label="查看帮助">?</button>
+      <button class="help-link" onclick="window.app.toggleHelp()" title="帮助" aria-label="查看帮助">?</button>
     </div>
 
     <div class="history" id="history" role="log" aria-label="历史记录"></div>
+  </div>
+
+  <!-- Help Modal -->
+  <div class="help-modal" id="helpModal">
+    <div class="help-modal-content">
+      <button class="help-modal-close" onclick="window.app.toggleHelp()" aria-label="关闭帮助">&times;</button>
+      <iframe id="helpFrame" src="" title="帮助内容"></iframe>
+    </div>
   </div>
 
   <!-- Azure Speech SDK -->
