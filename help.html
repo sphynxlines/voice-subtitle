@@ -15,7 +15,7 @@
 <body>
 
   <div class="container">
-    <a href="/" class="back-link">← 返回</a>
+    <button class="back-link" onclick="goBack()">← 返回</button>
     
     <h1>📖 使用帮助</h1>
 
@@ -144,6 +144,29 @@
   </div>
 
   <script>
+    // Handle back navigation for both browser and PWA mode
+    function goBack() {
+      // Check if running as PWA
+      const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
+                    window.navigator.standalone === true;
+      
+      if (isPWA) {
+        // In PWA mode, close window if opened from main app, otherwise navigate
+        if (window.opener) {
+          window.close();
+        } else {
+          window.location.href = '/';
+        }
+      } else {
+        // In browser mode, use history or navigate to home
+        if (document.referrer && document.referrer.includes(window.location.host)) {
+          window.history.back();
+        } else {
+          window.location.href = '/';
+        }
+      }
+    }
+    
     function showDevice(device) {
       document.querySelectorAll('#android, #iphone').forEach(el => {
         el.classList.remove('active');

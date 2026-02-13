@@ -189,6 +189,25 @@ export class App {
   changeFontSize(delta) {
     this.ui.changeFontSize(delta);
   }
+  
+  /**
+   * Open help page (works in both browser and PWA mode)
+   */
+  openHelp() {
+    vibrate();
+    
+    // Check if running as PWA
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
+                  window.navigator.standalone === true;
+    
+    if (isPWA) {
+      // In PWA mode, open in new window/tab
+      window.open('/help.html', '_blank', 'noopener,noreferrer');
+    } else {
+      // In browser mode, navigate normally
+      window.location.href = '/help.html';
+    }
+  }
 
   /**
    * Cleanup
