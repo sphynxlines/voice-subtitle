@@ -44,7 +44,8 @@ export const CONFIG = {
   // Storage keys
   STORAGE_KEYS: {
     STATS_KEY: 'stats_key',
-    FONT_SIZE: 'subtitle_font_size'
+    FONT_SIZE: 'subtitle_font_size',
+    AUTO_START: 'auto_start_enabled'
   },
 
   // API endpoints

@@ -46,6 +46,7 @@
       <button class="btn-font" onclick="window.app.changeFontSize(-8)" aria-label="减小字体">A-</button>
       <span id="fontSizeDisplay" aria-label="当前字体大小">48px</span>
       <button class="btn-font" onclick="window.app.changeFontSize(8)" aria-label="增大字体">A+</button>
+      <button class="help-link" onclick="window.app.toggleSettings()" title="设置" aria-label="设置">⚙</button>
       <button class="help-link" onclick="window.app.toggleHelp()" title="帮助" aria-label="查看帮助">?</button>
     </div>
 
@@ -57,6 +58,22 @@
     <div class="help-modal-content">
       <button class="help-modal-close" onclick="window.app.toggleHelp()" aria-label="关闭帮助">&times;</button>
       <iframe id="helpFrame" src="" title="帮助内容"></iframe>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="help-modal" id="settingsModal">
+    <div class="help-modal-content" style="max-width: 400px; height: auto; padding: 30px;">
+      <button class="help-modal-close" onclick="window.app.toggleSettings()" aria-label="关闭设置">&times;</button>
+      <h2 style="margin-bottom: 20px; font-size: 24px;">⚙️ 设置</h2>
+      
+      <div class="setting-item">
+        <label class="setting-label">
+          <input type="checkbox" id="autoStartCheckbox" onchange="window.app.toggleAutoStart(this.checked)">
+          <span>自动开始监听</span>
+        </label>
+        <p class="setting-description">如果已授予麦克风权限，打开应用时自动开始监听</p>
+      </div>
     </div>
   </div>
 
