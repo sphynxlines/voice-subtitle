@@ -227,12 +227,13 @@ export class App {
     const needsInit = this.speechService.needsReinitialization();
     this.ui.showLoading(needsInit ? '正在初始化...' : '正在启动...');
     
-    // Reset speaker mapping and polished text
+    // Reset speaker mapping
     this.speechService.resetSpeakers();
-    this.ui.resetPolishedText();
 
     try {
       await this.speechService.start();
+      
+      console.log('[APP START] Speech service started, updating UI');
       
       // Update UI based on actual service state
       this.ui.updateButton(true);
@@ -243,7 +244,7 @@ export class App {
       // Enable wake lock
       await this.wakeLock.request();
       
-      console.log('[APP START] Success');
+      console.log('[APP START] Success - state:', this.speechService.state);
       
     } catch (error) {
       console.error('[APP START] Error:', error);
@@ -270,10 +271,12 @@ export class App {
       this.ui.updateButton(false);
       this.ui.updateStatus('已停止');
       this.ui.updateSubtitle('点击下方按钮开始', '');
-      this.ui.resetPolishedText();
       
       // Release wake lock
       await this.wakeLock.release();
+      
+      // Generate summary if there's conversation
+      await this.ui.showSummary();
       
       console.log('[APP STOP] Success');
       
@@ -285,7 +288,6 @@ export class App {
       this.ui.updateButton(false);
       this.ui.updateStatus('已停止');
       this.ui.updateSubtitle('点击下方按钮开始', '');
-      this.ui.resetPolishedText();
     }
   }
 

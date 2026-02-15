@@ -4,26 +4,39 @@
 
 import { CONFIG } from './config.js';
 import { ERROR_MESSAGES } from './errors.js';
-import { vibrate, formatTime, storage, createElement } from './utils.js';
-import TextPolisher from './text-polisher.js';
+import { vibrate, formatTime } from './utils.js';
+import GroqClient from './groq-client.js';
 
 export class UIController {
   constructor() {
     this.elements = {
       subtitleText: document.getElementById('subtitleText'),
-      polishedText: document.getElementById('polishedText'),
       btnStart: document.getElementById('btnStart'),
       statusText: document.getElementById('statusText'),
       connectionIndicator: document.getElementById('connectionIndicator'),
-      networkStatus: document.getElementById('networkStatus')
+      networkStatus: document.getElementById('networkStatus'),
+      historyList: document.getElementById('historyList'),
+      btnClearHistory: document.getElementById('btnClearHistory')
     };
     
-    this.textPolisher = new TextPolisher();
-    this.polishTimer = null;
+    this.groqClient = new GroqClient();
+    this.transcript = []; // Store full conversation
+    this.setupHistoryHandlers();
   }
 
   /**
-   * Update subtitle text (raw, real-time)
+   * Setup history event handlers
+   */
+  setupHistoryHandlers() {
+    if (this.elements.btnClearHistory) {
+      this.elements.btnClearHistory.addEventListener('click', () => {
+        this.clearHistory();
+      });
+    }
+  }
+
+  /**
+   * Update subtitle text (real-time)
    */
   updateSubtitle(speaker, text, isRecognizing = false) {
     if (!text) {
@@ -31,6 +44,9 @@ export class UIController {
       this.elements.subtitleText.textContent = newText;
       return;
     }
+    
+    // Don't add placeholder text to transcript
+    const isPlaceholder = text === '正在听...' || text === '点击下方按钮开始';
     
     const displayText = speaker ? `${speaker}: ${text}` : text;
     
@@ -40,38 +56,96 @@ export class UIController {
     } else {
       this.elements.subtitleText.textContent = displayText;
       
-      // Add to polisher buffer and update polished text
-      this.textPolisher.addText(speaker, text);
-      this.schedulePolishUpdate();
-    }
-  }
-  
-  /**
-   * Schedule polished text update (debounced)
-   */
-  schedulePolishUpdate() {
-    if (this.polishTimer) {
-      clearTimeout(this.polishTimer);
-    }
-    
-    // Update polished text after 500ms of no new text
-    this.polishTimer = setTimeout(() => {
-      const polished = this.textPolisher.polish();
-      if (polished) {
-        this.elements.polishedText.textContent = polished;
+      // Only add real speech to transcript and history (not placeholders)
+      if (!isPlaceholder && speaker) {
+        this.addToTranscript(speaker, text);
+        this.addToHistory(speaker, text);
       }
-    }, 500);
+    }
   }
-  
+
   /**
-   * Reset polished text
+   * Add to transcript (for summarization)
    */
-  resetPolishedText() {
-    this.textPolisher.reset();
-    this.elements.polishedText.textContent = '等待中...';
-    if (this.polishTimer) {
-      clearTimeout(this.polishTimer);
-      this.polishTimer = null;
+  addToTranscript(speaker, text) {
+    this.transcript.push({
+      speaker,
+      text,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Add to history display
+   */
+  addToHistory(speaker, text) {
+    const historyItem = document.createElement('div');
+    historyItem.className = 'history-item';
+    
+    const time = new Date().toLocaleTimeString('zh-CN', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    historyItem.innerHTML = `
+      <div>
+        <span class="history-item-speaker">${speaker}:</span>
+        <span class="history-item-text">${text}</span>
+      </div>
+      <div class="history-item-time">${time}</div>
+    `;
+    
+    this.elements.historyList.appendChild(historyItem);
+    
+    // Auto-scroll to bottom
+    this.elements.historyList.scrollTop = this.elements.historyList.scrollHeight;
+    
+    // Limit history items (keep last 50)
+    const items = this.elements.historyList.children;
+    if (items.length > 50) {
+      this.elements.historyList.removeChild(items[0]);
+    }
+  }
+
+  /**
+   * Clear history
+   */
+  clearHistory() {
+    this.elements.historyList.innerHTML = '';
+    this.transcript = [];
+    // Reset subtitle to default
+    this.elements.subtitleText.textContent = '点击下方按钮开始';
+  }
+
+  /**
+   * Generate and show summary
+   */
+  async showSummary() {
+    // Only show summary if there's actual conversation (not just placeholders)
+    if (this.transcript.length === 0) {
+      console.log('[SUMMARY] No transcript to summarize');
+      return;
+    }
+
+    console.log('[SUMMARY] Generating summary for', this.transcript.length, 'items');
+
+    // Show loading in main subtitle area
+    this.elements.subtitleText.innerHTML = 
+      '<span class="recognizing">📝 正在生成对话总结...</span>';
+
+    try {
+      const summary = await this.groqClient.summarize(this.transcript);
+      
+      // Show summary in main subtitle area
+      this.elements.subtitleText.innerHTML = `
+        <div style="font-size: 0.6em; color: #27ae60; margin-bottom: 10px;">📝 对话总结</div>
+        <div style="font-size: 0.7em; line-height: 1.5;">${summary}</div>
+      `;
+      
+    } catch (error) {
+      console.error('Failed to generate summary:', error);
+      this.elements.subtitleText.innerHTML = 
+        '<span style="color: #e74c3c;">总结生成失败: ' + error.message + '</span>';
     }
   }
 
@@ -83,7 +157,6 @@ export class UIController {
     
     const message = ERROR_MESSAGES[error.type] || ERROR_MESSAGES.unknown;
     this.elements.subtitleText.textContent = message;
-    this.elements.polishedText.textContent = '';
     this.elements.statusText.textContent = '❌ ' + error.message;
     this.updateConnectionStatus('disconnected');
   }
@@ -163,8 +236,7 @@ export class UIController {
    * Reset UI to initial state
    */
   reset() {
-    this.updateSubtitle('', '点击下方按钮开始');
-    this.resetPolishedText();
+    this.elements.subtitleText.textContent = '点击下方按钮开始';
     this.updateStatus('准备就绪');
     this.updateButton(false);
     this.setButtonEnabled(true);

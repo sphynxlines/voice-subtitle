@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v4'; // Updated for button fix
+const CACHE_NAME = 'voice-subtitle-v8'; // Fixed Azure Speech SDK websocket error
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -24,7 +24,7 @@ const ASSETS_TO_CACHE = [
   '/src/js/network-monitor.js',
   '/src/js/speech-recognition.js',
   '/src/js/ui-controller.js',
-  '/src/js/text-polisher.js', // Added new file
+  '/src/js/groq-client.js', // Added new file
   '/src/js/app.js',
   '/src/js/stats-page.js'
 ];

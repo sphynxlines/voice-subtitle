@@ -26,23 +26,22 @@
     ⚠️ 网络已断开
   </div>
 
-  <!-- Dual subtitle display -->
+  <!-- Single subtitle display -->
   <div class="subtitle-container">
-    <!-- Raw subtitle (real-time) -->
-    <div class="subtitle-section">
-      <div class="subtitle-label">实时</div>
-      <div class="subtitle-text" id="subtitleText">
-        点击下方按钮开始
-      </div>
+    <div class="subtitle-text" id="subtitleText">
+      点击下方按钮开始
     </div>
+  </div>
 
-    <!-- Polished subtitle (cleaned) -->
-    <div class="subtitle-section polished">
-      <div class="subtitle-label">优化</div>
-      <div class="subtitle-text" id="polishedText">
-        等待中...
-      </div>
+  <!-- History section -->
+  <div class="history-section" id="historySection">
+    <div class="history-header">
+      <span>历史记录</span>
+      <button class="btn-clear-history" id="btnClearHistory" aria-label="清除历史">
+        清除
+      </button>
     </div>
+    <div class="history-list" id="historyList"></div>
   </div>
 
   <!-- Simplified control area -->
