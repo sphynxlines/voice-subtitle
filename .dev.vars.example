@@ -1,0 +1,11 @@
+# Local Development Environment Variables
+# Copy this file to .dev.vars and fill in your Azure credentials
+
+# Azure Speech Service Credentials
+AZURE_KEY=your_azure_speech_key_here
+AZURE_REGION=eastus
+
+# These are automatically provided by Cloudflare Pages in production
+# For local testing, you can leave these empty (rate limiting will be disabled)
+# RATE_LIMIT=
+# STATS=

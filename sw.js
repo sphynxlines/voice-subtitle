@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v3'; // Updated for iPad layout fix
+const CACHE_NAME = 'voice-subtitle-v4'; // Updated for button fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

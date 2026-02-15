@@ -20,6 +20,7 @@ export class App {
     this.setupEventHandlers();
     this.setupNetworkMonitoring();
     this.setupVisibilityHandling();
+    this.setupButtonListener(); // Add direct button listener
     
     // Preload token in background for faster startup
     this.preloadToken();
@@ -56,6 +57,28 @@ export class App {
       }
     } catch (error) {
       console.warn('Speech service prewarm failed (will initialize on start):', error);
+    }
+  }
+
+  /**
+   * Setup direct button listener as backup
+   */
+  setupButtonListener() {
+    const btnStart = document.getElementById('btnStart');
+    if (btnStart) {
+      // Add event listener as backup (in addition to inline onclick)
+      btnStart.addEventListener('click', () => {
+        console.log('[BUTTON] Direct listener triggered');
+        this.toggleListening();
+      });
+      
+      // Add hover/touch prewarm listeners
+      btnStart.addEventListener('mouseenter', () => this.prewarmSpeechService());
+      btnStart.addEventListener('touchstart', () => this.prewarmSpeechService(), { passive: true });
+      
+      console.log('[BUTTON] Direct listeners attached');
+    } else {
+      console.error('[BUTTON] btnStart element not found!');
     }
   }
 
@@ -278,14 +301,25 @@ export class App {
 // Initialize app when DOM is ready
 let app;
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
+function initializeApp() {
+  try {
+    console.log('[INIT] Starting app initialization...');
     app = new App();
     window.app = app; // Expose for inline event handlers
-  });
+    console.log('[INIT] App initialized successfully');
+    console.log('[INIT] window.app exists:', !!window.app);
+    console.log('[INIT] toggleListening exists:', typeof window.app?.toggleListening);
+  } catch (error) {
+    console.error('[INIT] Failed to initialize app:', error);
+    // Show error to user
+    document.getElementById('statusText').textContent = '初始化失败: ' + error.message;
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp);
 } else {
-  app = new App();
-  window.app = app;
+  initializeApp();
 }
 
 export default App;

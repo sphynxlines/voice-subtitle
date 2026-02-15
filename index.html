@@ -50,9 +50,6 @@
     <button 
       class="btn-start" 
       id="btnStart" 
-      onclick="window.app.toggleListening()" 
-      onmouseenter="window.app.prewarmSpeechService()"
-      ontouchstart="window.app.prewarmSpeechService()"
       aria-label="开始或停止语音识别">
       开始
     </button>
@@ -78,7 +75,35 @@
   </script>
   
   <!-- Application -->
-  <script type="module" src="/src/js/app.js"></script>
+  <script type="module">
+    // Error handler for module loading
+    window.addEventListener('error', (e) => {
+      console.error('Global error:', e.error || e.message);
+      const statusEl = document.getElementById('statusText');
+      if (statusEl) {
+        statusEl.textContent = '❌ 加载失败: ' + (e.error?.message || e.message);
+      }
+    });
+
+    // Import and verify app loads
+    import('./src/js/app.js')
+      .then(() => {
+        console.log('✅ App module loaded');
+        // Wait a bit for initialization
+        setTimeout(() => {
+          if (!window.app) {
+            console.error('❌ window.app not set after module load');
+            document.getElementById('statusText').textContent = '❌ 应用初始化失败';
+          } else {
+            console.log('✅ window.app ready');
+          }
+        }, 100);
+      })
+      .catch(err => {
+        console.error('❌ Failed to load app module:', err);
+        document.getElementById('statusText').textContent = '❌ 模块加载失败: ' + err.message;
+      });
+  </script>
 
 </body>
 </html>
