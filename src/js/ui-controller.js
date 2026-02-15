@@ -121,6 +121,12 @@ export class UIController {
    * Generate and show summary
    */
   async showSummary() {
+    // Check if summary feature is enabled
+    if (!CONFIG.FEATURES.ENABLE_SUMMARY) {
+      console.log('[SUMMARY] Feature disabled in config');
+      return;
+    }
+
     // Only show summary if there's actual conversation (not just placeholders)
     if (this.transcript.length === 0) {
       console.log('[SUMMARY] No transcript to summarize');

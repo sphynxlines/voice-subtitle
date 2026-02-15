@@ -16,6 +16,7 @@ export class App {
     this.ui = new UIController();
     this.wakeLock = new WakeLockManager();
     this.networkMonitor = new NetworkMonitor();
+    this.isPreloading = false; // Guard against multiple preloads
     
     this.setupEventHandlers();
     this.setupNetworkMonitoring();
@@ -31,12 +32,22 @@ export class App {
    * Failures are non-critical - token will be fetched on demand
    */
   async preloadToken() {
+    // Prevent multiple simultaneous preloads
+    if (this.isPreloading) {
+      console.log('Token preload already in progress');
+      return;
+    }
+    
+    this.isPreloading = true;
+    
     try {
       await this.speechService.tokenManager.getToken();
       console.log('Token preloaded successfully');
     } catch (error) {
       // Non-critical failure - log but don't alert user
       console.warn('Token preload failed (will retry on start):', error);
+    } finally {
+      this.isPreloading = false;
     }
   }
   
@@ -302,8 +313,17 @@ export class App {
 
 // Initialize app when DOM is ready
 let app;
+let isInitializing = false;
 
 function initializeApp() {
+  // Prevent multiple initializations
+  if (isInitializing || app) {
+    console.log('[INIT] Already initialized or initializing, skipping');
+    return;
+  }
+  
+  isInitializing = true;
+  
   try {
     console.log('[INIT] Starting app initialization...');
     app = new App();
@@ -314,7 +334,12 @@ function initializeApp() {
   } catch (error) {
     console.error('[INIT] Failed to initialize app:', error);
     // Show error to user
-    document.getElementById('statusText').textContent = '初始化失败: ' + error.message;
+    const statusEl = document.getElementById('statusText');
+    if (statusEl) {
+      statusEl.textContent = '初始化失败: ' + error.message;
+    }
+  } finally {
+    isInitializing = false;
   }
 }
 

@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v9'; // Force cache clear for iPhone modal error fix
+const CACHE_NAME = 'voice-subtitle-v13'; // LLM disabled by default, improved error handling
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

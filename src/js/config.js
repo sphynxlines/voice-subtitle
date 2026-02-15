@@ -58,7 +58,14 @@ export const CONFIG = {
     'voice.calm.rocks',
     'localhost',
     '127.0.0.1'
-  ]
+  ],
+
+  // Feature flags
+  FEATURES: {
+    // Enable/disable LLM summarization
+    // Set to false to disable summary generation (useful if LLM API is unavailable)
+    ENABLE_SUMMARY: false  // Disabled due to timeout issues - enable after testing
+  }
 };
 
 export default CONFIG;

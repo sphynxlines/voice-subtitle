@@ -5,6 +5,7 @@
 export class GroqClient {
   constructor() {
     this.apiEndpoint = '/api/summarize'; // Cloudflare Function endpoint
+    this.timeout = 50000; // 50 second timeout (increased for slower networks)
   }
 
   /**
@@ -18,13 +19,20 @@ export class GroqClient {
     }
 
     try {
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
       const response = await fetch(this.apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ transcript })
+        body: JSON.stringify({ transcript }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
@@ -32,10 +40,25 @@ export class GroqClient {
       }
 
       const data = await response.json();
+      
+      if (!data.summary) {
+        throw new Error('No summary returned from API');
+      }
+      
       return data.summary;
 
     } catch (error) {
       console.error('Groq summarization error:', error);
+      
+      // Provide user-friendly error messages
+      if (error.name === 'AbortError') {
+        throw new Error('总结请求超时');
+      } else if (error.message.includes('HTTP 500')) {
+        throw new Error('服务器错误，请稍后重试');
+      } else if (error.message.includes('Failed to fetch')) {
+        throw new Error('网络错误，请检查连接');
+      }
+      
       throw error;
     }
   }

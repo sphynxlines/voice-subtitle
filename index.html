@@ -66,36 +66,28 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        // Unregister all service workers first to force fresh install
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          const unregisterPromises = registrations.map(reg => {
-            console.log('Unregistering old service worker');
-            return reg.unregister();
-          });
-          
-          return Promise.all(unregisterPromises);
-        }).then(() => {
-          // Register new service worker
-          return navigator.serviceWorker.register('/sw.js');
-        }).then(reg => {
-          console.log('Service Worker registered');
-          
-          // Force update check
-          reg.update();
-          
-          // Listen for updates
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'activated') {
-                console.log('New service worker activated, reloading...');
-                window.location.reload();
-              }
+        // Simple registration without aggressive unregistration
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => {
+            console.log('Service Worker registered');
+            
+            // Check for updates but don't force reload
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              console.log('Service Worker update found');
+              
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'activated' && !navigator.serviceWorker.controller) {
+                  // Only reload if this is the first activation
+                  console.log('First service worker activation');
+                  window.location.reload();
+                }
+              });
             });
+          })
+          .catch(err => {
+            console.log('Service Worker registration failed:', err);
           });
-        }).catch(err => {
-          console.log('Service Worker registration failed:', err);
-        });
       });
     }
   </script>
