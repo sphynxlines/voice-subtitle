@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v8'; // Fixed Azure Speech SDK websocket error
+const CACHE_NAME = 'voice-subtitle-v9'; // Force cache clear for iPhone modal error fix
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -24,32 +24,56 @@ const ASSETS_TO_CACHE = [
   '/src/js/network-monitor.js',
   '/src/js/speech-recognition.js',
   '/src/js/ui-controller.js',
-  '/src/js/groq-client.js', // Added new file
+  '/src/js/groq-client.js',
   '/src/js/app.js',
   '/src/js/stats-page.js'
 ];
 
 // Install event - cache assets
 self.addEventListener('install', (event) => {
+  console.log('[SW] Installing version', CACHE_NAME);
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS_TO_CACHE))
-      .then(() => self.skipWaiting())
+    // Delete ALL old caches first
+    caches.keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((name) => {
+            console.log('[SW] Deleting old cache:', name);
+            return caches.delete(name);
+          })
+        );
+      })
+      .then(() => caches.open(CACHE_NAME))
+      .then((cache) => {
+        console.log('[SW] Caching assets');
+        return cache.addAll(ASSETS_TO_CACHE);
+      })
+      .then(() => {
+        console.log('[SW] Skip waiting');
+        return self.skipWaiting();
+      })
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up and take control immediately
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating version', CACHE_NAME);
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => {
         return Promise.all(
           cacheNames
             .filter((name) => name !== CACHE_NAME)
-            .map((name) => caches.delete(name))
+            .map((name) => {
+              console.log('[SW] Deleting cache:', name);
+              return caches.delete(name);
+            })
         );
       })
-      .then(() => self.clients.claim())
+      .then(() => {
+        console.log('[SW] Claiming clients');
+        return self.clients.claim();
+      })
   );
 });
 
