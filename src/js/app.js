@@ -4,7 +4,7 @@
 
 import { CONFIG } from './config.js';
 import { NetworkError, parseError } from './errors.js';
-import { vibrate, storage } from './utils.js';
+import { vibrate } from './utils.js';
 import SpeechRecognitionService from './speech-recognition.js';
 import UIController from './ui-controller.js';
 import WakeLockManager from './wake-lock.js';
@@ -18,73 +18,10 @@ export class App {
     this.networkMonitor = new NetworkMonitor();
     
     this.isListening = false;
-    this.autoStartAttempted = false;
     
     this.setupEventHandlers();
     this.setupNetworkMonitoring();
     this.setupVisibilityHandling();
-    
-    // Check permission and auto-start if granted
-    this.checkPermissionAndAutoStart();
-  }
-  
-  /**
-   * Check microphone permission and auto-start if granted
-   */
-  async checkPermissionAndAutoStart() {
-    try {
-      // Check user preference for auto-start
-      const autoStartEnabled = storage.get(CONFIG.STORAGE_KEYS.AUTO_START, true); // Default: enabled
-      
-      if (!autoStartEnabled) {
-        console.log('Auto-start disabled by user preference');
-        this.ui.updateStatus('准备就绪');
-        return;
-      }
-      
-      // Check if Permissions API is available
-      if (!navigator.permissions || !navigator.permissions.query) {
-        console.log('Permissions API not available');
-        return;
-      }
-      
-      // Query microphone permission
-      const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-      
-      console.log('Microphone permission status:', permissionStatus.state);
-      
-      if (permissionStatus.state === 'granted') {
-        // Permission already granted, auto-start after a short delay
-        console.log('Microphone permission granted, auto-starting...');
-        this.ui.updateStatus('🎤 自动启动中...');
-        
-        // Small delay to let UI settle
-        setTimeout(() => {
-          this.autoStartAttempted = true;
-          this.start();
-        }, 500);
-      } else if (permissionStatus.state === 'prompt') {
-        console.log('Microphone permission will be prompted');
-        this.ui.updateStatus('点击「开始」按钮使用');
-      } else {
-        console.log('Microphone permission denied');
-        this.ui.updateStatus('需要麦克风权限');
-      }
-      
-      // Listen for permission changes
-      permissionStatus.addEventListener('change', () => {
-        console.log('Permission changed to:', permissionStatus.state);
-        if (permissionStatus.state === 'granted' && !this.isListening && !this.autoStartAttempted && autoStartEnabled) {
-          this.autoStartAttempted = true;
-          this.start();
-        }
-      });
-      
-    } catch (error) {
-      console.log('Permission check error:', error);
-      // Fallback: just show ready state
-      this.ui.updateStatus('准备就绪');
-    }
   }
 
   /**
@@ -166,30 +103,19 @@ export class App {
    * Setup help modal event handlers
    */
   setupHelpModal() {
-    const helpModal = document.getElementById('helpModal');
-    const settingsModal = document.getElementById('settingsModal');
+    const modal = document.getElementById('helpModal');
     
     // Close on ESC key
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        if (helpModal.classList.contains('active')) {
-          this.toggleHelp();
-        } else if (settingsModal.classList.contains('active')) {
-          this.toggleSettings();
-        }
-      }
-    });
-    
-    // Close on click outside
-    helpModal.addEventListener('click', (e) => {
-      if (e.target === helpModal) {
+      if (e.key === 'Escape' && modal.classList.contains('active')) {
         this.toggleHelp();
       }
     });
     
-    settingsModal.addEventListener('click', (e) => {
-      if (e.target === settingsModal) {
-        this.toggleSettings();
+    // Close on click outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.toggleHelp();
       }
     });
   }
@@ -309,38 +235,6 @@ export class App {
       modal.classList.add('active');
       body.classList.add('modal-open');
     }
-  }
-  
-  /**
-   * Toggle settings modal
-   */
-  toggleSettings() {
-    vibrate();
-    
-    const modal = document.getElementById('settingsModal');
-    const checkbox = document.getElementById('autoStartCheckbox');
-    const body = document.body;
-    
-    if (modal.classList.contains('active')) {
-      // Close modal
-      modal.classList.remove('active');
-      body.classList.remove('modal-open');
-    } else {
-      // Open modal and set checkbox state
-      const autoStartEnabled = storage.get(CONFIG.STORAGE_KEYS.AUTO_START, true);
-      checkbox.checked = autoStartEnabled;
-      modal.classList.add('active');
-      body.classList.add('modal-open');
-    }
-  }
-  
-  /**
-   * Toggle auto-start preference
-   */
-  toggleAutoStart(enabled) {
-    vibrate();
-    storage.set(CONFIG.STORAGE_KEYS.AUTO_START, enabled);
-    console.log('Auto-start preference:', enabled ? 'enabled' : 'disabled');
   }
 
   /**
