@@ -17,9 +17,6 @@ export class App {
     this.wakeLock = new WakeLockManager();
     this.networkMonitor = new NetworkMonitor();
     
-    this.isListening = false;
-    this.isPrewarming = false;
-    
     this.setupEventHandlers();
     this.setupNetworkMonitoring();
     this.setupVisibilityHandling();
@@ -47,24 +44,18 @@ export class App {
    * This is an optimization - failures are handled gracefully
    */
   async prewarmSpeechService() {
-    // Prevent multiple simultaneous prewarm attempts
-    if (this.isPrewarming || this.isListening) {
+    // Don't prewarm if busy or already listening
+    if (this.speechService.isBusy || this.speechService.isListening) {
       return;
     }
     
-    this.isPrewarming = true;
-    
     try {
-      // Only prewarm if we don't have a transcriber or it needs refresh
       if (this.speechService.needsReinitialization()) {
         await this.speechService.ensureFreshTranscriber();
         console.log('Speech service pre-initialized');
       }
     } catch (error) {
-      // Non-critical failure - start() will handle initialization
       console.warn('Speech service prewarm failed (will initialize on start):', error);
-    } finally {
-      this.isPrewarming = false;
     }
   }
 
@@ -74,25 +65,19 @@ export class App {
   setupEventHandlers() {
     // Real-time transcription
     this.speechService.onTranscribing = (speaker, text, isRecognizing) => {
-      console.log('onTranscribing fired:', { speaker, text, isListening: this.isListening });
-      // Only update if still listening
-      if (this.isListening) {
+      // Only update if actually listening (check service state)
+      if (this.speechService.isListening) {
         this.ui.updateSubtitle(speaker, text, isRecognizing);
-      } else {
-        console.log('Ignoring transcribing event - not listening');
       }
     };
 
     // Final transcription
     this.speechService.onTranscribed = (speaker, text, isRecognizing) => {
-      console.log('onTranscribed fired:', { speaker, text, isListening: this.isListening });
-      // Only update if still listening
-      if (this.isListening) {
+      // Only update if actually listening (check service state)
+      if (this.speechService.isListening) {
         const line = `${speaker}: ${text}`;
         this.ui.updateSubtitle(speaker, text, isRecognizing);
         this.ui.addToHistory(line);
-      } else {
-        console.log('Ignoring transcribed event - not listening');
       }
     };
 
@@ -122,7 +107,6 @@ export class App {
     // Session expiring warning
     this.speechService.onSessionExpiring = () => {
       console.log('Session expiring soon, will auto-restart');
-      // Could show a brief notification to user if desired
     };
   }
   
@@ -162,7 +146,8 @@ export class App {
     this.networkMonitor.subscribe((status, isOnline) => {
       this.ui.updateNetworkStatus(isOnline);
       
-      if (!isOnline && this.isListening) {
+      // If network lost while listening, stop
+      if (!isOnline && this.speechService.isListening) {
         this.ui.showError(new NetworkError());
         this.stop();
       }
@@ -177,12 +162,11 @@ export class App {
    */
   setupVisibilityHandling() {
     document.addEventListener('visibilitychange', async () => {
-      if (document.visibilityState === 'visible' && this.isListening) {
+      if (document.visibilityState === 'visible' && this.speechService.isListening) {
         await this.wakeLock.request();
       }
     });
     
-    // Setup help modal handlers
     this.setupHelpModal();
   }
   
@@ -208,18 +192,21 @@ export class App {
   }
 
   /**
-   * Toggle listening state
+   * Toggle listening state - SIMPLIFIED
    */
   async toggleListening() {
     vibrate();
     
-    // Prevent rapid clicking
-    if (this.speechService.isTransitioning) {
-      console.log('Operation in progress, ignoring click');
+    console.log(`[TOGGLE] Current state: ${this.speechService.state}`);
+    
+    // If busy, ignore click
+    if (this.speechService.isBusy) {
+      console.log('[TOGGLE] Busy, ignoring click');
       return;
     }
     
-    if (this.isListening) {
+    // Toggle based on actual service state
+    if (this.speechService.isListening) {
       await this.stop();
     } else {
       await this.start();
@@ -227,16 +214,18 @@ export class App {
   }
 
   /**
-   * Start listening
+   * Start listening - SIMPLIFIED
    */
   async start() {
+    console.log('[APP START] Begin');
+    
     // Check network
     if (!this.networkMonitor.getStatus()) {
       this.ui.showError(new NetworkError());
       return;
     }
 
-    // Show appropriate loading message
+    // Show loading
     const needsInit = this.speechService.needsReinitialization();
     this.ui.showLoading(needsInit ? '正在初始化...' : '正在启动...');
     
@@ -246,7 +235,7 @@ export class App {
     try {
       await this.speechService.start();
       
-      this.isListening = true;
+      // Update UI based on actual service state
       this.ui.updateButton(true);
       this.ui.updateStatus('🎤 正在听...');
       this.ui.updateSubtitle('', '正在听...');
@@ -255,75 +244,47 @@ export class App {
       // Enable wake lock
       await this.wakeLock.request();
       
+      console.log('[APP START] Success');
+      
     } catch (error) {
-      console.error('Start error:', error);
+      console.error('[APP START] Error:', error);
       const parsedError = parseError(error);
       this.ui.showError(parsedError);
       this.ui.hideLoading();
       
-      // Clean up on error to ensure fresh start next time
-      try {
-        if (this.speechService.transcriber) {
-          this.speechService.transcriber.close();
-          this.speechService.transcriber = null;
-        }
-      } catch (cleanupError) {
-        console.warn('Cleanup error:', cleanupError);
-      }
+      // Force reset on error
+      this.speechService.forceReset();
+      this.ui.updateButton(false);
     }
   }
 
   /**
-   * Stop listening
+   * Stop listening - SIMPLIFIED
    */
   async stop() {
-    console.log('=== STOP CALLED ===');
-    
-    // Prevent double-stop
-    if (!this.isListening) {
-      console.log('Already stopped, ignoring');
-      return;
-    }
+    console.log('[APP STOP] Begin');
     
     try {
-      // Set flag first to prevent event handlers from updating UI
-      this.isListening = false;
-      console.log('isListening set to false');
-      
       await this.speechService.stop();
-      console.log('speechService.stop() completed');
       
+      // Update UI based on actual service state
       this.ui.updateButton(false);
-      console.log('Button updated');
-      
       this.ui.updateStatus('已停止');
-      console.log('Status updated');
-      
-      // Clear subtitle and show default message
       this.ui.updateSubtitle('点击下方按钮开始', '');
-      console.log('Subtitle reset completed');
       
       // Release wake lock
       await this.wakeLock.release();
       
+      console.log('[APP STOP] Success');
+      
     } catch (error) {
-      console.error('Stop error:', error);
+      console.error('[APP STOP] Error:', error);
       
-      // Force state reset even on error
-      this.isListening = false;
+      // Force reset on error - always recover
+      this.speechService.forceReset();
       this.ui.updateButton(false);
-      this.ui.updateStatus('已停止 (出错)');
+      this.ui.updateStatus('已停止');
       this.ui.updateSubtitle('点击下方按钮开始', '');
-      
-      // Try to clean up transcriber
-      try {
-        if (this.speechService.transcriber) {
-          this.speechService.transcriber.close();
-          this.speechService.transcriber = null;
-        }
-      } catch (cleanupError) {
-        console.warn('Cleanup error:', cleanupError);
-      }
     }
   }
 

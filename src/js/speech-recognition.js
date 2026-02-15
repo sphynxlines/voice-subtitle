@@ -10,12 +10,13 @@ export class SpeechRecognitionService {
   constructor() {
     this.transcriber = null;
     this.tokenManager = new TokenManager();
-    this.isListening = false;
     this.speakerMap = new Map();
     this.lastInitialized = null;
     this.sessionStartTime = null;
     this.sessionHealthCheckTimer = null;
-    this.isTransitioning = false; // Prevent race conditions
+    
+    // SINGLE SOURCE OF TRUTH - only this matters
+    this._state = 'stopped'; // 'stopped', 'starting', 'listening', 'stopping'
     
     // Event handlers
     this.onTranscribing = null;
@@ -23,7 +24,47 @@ export class SpeechRecognitionService {
     this.onError = null;
     this.onSessionStarted = null;
     this.onSessionStopped = null;
-    this.onSessionExpiring = null; // New: warn before token expires
+    this.onSessionExpiring = null;
+  }
+  
+  /**
+   * Get current state - SINGLE SOURCE OF TRUTH
+   */
+  get state() {
+    return this._state;
+  }
+  
+  /**
+   * Check if currently listening
+   */
+  get isListening() {
+    return this._state === 'listening';
+  }
+  
+  /**
+   * Check if busy (transitioning)
+   */
+  get isBusy() {
+    return this._state === 'starting' || this._state === 'stopping';
+  }
+  
+  /**
+   * Force reset to stopped state - recovery mechanism
+   */
+  forceReset() {
+    console.warn('FORCE RESET - recovering from bad state');
+    this._state = 'stopped';
+    this.stopSessionHealthCheck();
+    this.sessionStartTime = null;
+    
+    if (this.transcriber) {
+      try {
+        this.transcriber.close();
+      } catch (e) {
+        console.warn('Error closing transcriber during reset:', e);
+      }
+      this.transcriber = null;
+    }
   }
 
   /**
@@ -160,47 +201,58 @@ export class SpeechRecognitionService {
   }
 
   /**
-   * Start transcription
+   * Start transcription - SIMPLIFIED
    */
   async start() {
-    // Prevent race conditions
-    if (this.isTransitioning) {
-      console.warn('Start called while transitioning, ignoring');
-      throw new Error('Operation in progress');
+    console.log(`[START] Current state: ${this._state}`);
+    
+    // Auto-recovery: if stuck in bad state, force reset
+    if (this._state === 'starting' || this._state === 'stopping') {
+      console.warn('Stuck in transition state, forcing reset');
+      this.forceReset();
     }
     
-    if (this.isListening) {
-      console.warn('Already listening');
+    // Already listening? Just return
+    if (this._state === 'listening') {
+      console.log('Already listening');
       return;
     }
     
-    this.isTransitioning = true;
+    this._state = 'starting';
     
     try {
-      // Always ensure transcriber is fresh and token is valid
+      // Ensure fresh transcriber
       await this.ensureFreshTranscriber();
 
+      // Start transcribing
       await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Start timeout'));
+        }, 10000); // 10 second timeout
+        
         this.transcriber.startTranscribingAsync(
           () => {
-            this.isListening = true;
+            clearTimeout(timeout);
+            this._state = 'listening';
             this.sessionStartTime = Date.now();
-            console.log('Transcription started');
-            
-            // Start session health monitoring
             this.startSessionHealthCheck();
-            
+            console.log('[START] Success - now listening');
             resolve();
           },
           (error) => {
-            console.error('Start error:', error);
-            const parsedError = parseError(error);
-            reject(parsedError);
+            clearTimeout(timeout);
+            console.error('[START] Failed:', error);
+            this._state = 'stopped';
+            reject(parseError(error));
           }
         );
       });
-    } finally {
-      this.isTransitioning = false;
+    } catch (error) {
+      // On any error, force back to stopped
+      console.error('[START] Error, forcing stopped state');
+      this._state = 'stopped';
+      this.stopSessionHealthCheck();
+      throw error;
     }
   }
   
@@ -208,12 +260,11 @@ export class SpeechRecognitionService {
    * Monitor session health during long sessions
    */
   startSessionHealthCheck() {
-    // Clear any existing timer
     this.stopSessionHealthCheck();
     
-    // Check every minute
     this.sessionHealthCheckTimer = setInterval(() => {
-      if (!this.isListening) {
+      // Double-check we're actually listening
+      if (this._state !== 'listening') {
         this.stopSessionHealthCheck();
         return;
       }
@@ -221,17 +272,17 @@ export class SpeechRecognitionService {
       const sessionDuration = Date.now() - this.sessionStartTime;
       const sessionMinutes = Math.floor(sessionDuration / 60000);
       
-      console.log(`Session health check: ${sessionMinutes} minutes active`);
+      console.log(`[HEALTH] Session: ${sessionMinutes} minutes, State: ${this._state}`);
       
-      // Warn at 7 minutes (2 minutes before token expires)
+      // Warn at 7 minutes
       if (sessionMinutes === 7 && this.onSessionExpiring) {
-        console.warn('Session approaching token expiry');
+        console.warn('[HEALTH] Session approaching token expiry');
         this.onSessionExpiring();
       }
       
-      // Force restart at 8.5 minutes to prevent token expiry during session
+      // Force restart at 8.5 minutes
       if (sessionMinutes >= 8.5) {
-        console.warn('Session too long, forcing restart for token refresh');
+        console.warn('[HEALTH] Session too long, forcing restart');
         if (this.onError) {
           this.onError({
             type: 'session-timeout',
@@ -239,7 +290,7 @@ export class SpeechRecognitionService {
           });
         }
       }
-    }, 60000); // Check every minute
+    }, 60000);
   }
   
   /**
@@ -253,37 +304,40 @@ export class SpeechRecognitionService {
   }
 
   /**
-   * Stop transcription
+   * Stop transcription - SIMPLIFIED
    */
   async stop() {
-    // Prevent race conditions
-    if (this.isTransitioning) {
-      console.warn('Stop called while transitioning, ignoring');
-      throw new Error('Operation in progress');
-    }
+    console.log(`[STOP] Current state: ${this._state}`);
     
-    if (!this.isListening) {
-      console.warn('Not listening, nothing to stop');
+    // Auto-recovery: if stuck in bad state, force reset
+    if (this._state === 'starting' || this._state === 'stopping') {
+      console.warn('Stuck in transition state, forcing reset');
+      this.forceReset();
       return;
     }
     
-    this.isTransitioning = true;
+    // Already stopped? Just return
+    if (this._state === 'stopped') {
+      console.log('Already stopped');
+      return;
+    }
+    
+    this._state = 'stopping';
+    this.stopSessionHealthCheck();
     
     try {
-      // Stop health monitoring first
-      this.stopSessionHealthCheck();
-      
       if (!this.transcriber) {
-        console.warn('No transcriber to stop');
-        this.isListening = false;
+        console.log('[STOP] No transcriber, just reset state');
+        this._state = 'stopped';
         this.sessionStartTime = null;
         return;
       }
 
+      // Stop transcribing with timeout
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          console.warn('Stop timeout, forcing state reset');
-          this.isListening = false;
+          console.warn('[STOP] Timeout, forcing stopped');
+          this._state = 'stopped';
           this.sessionStartTime = null;
           resolve();
         }, 5000); // 5 second timeout
@@ -291,28 +345,25 @@ export class SpeechRecognitionService {
         this.transcriber.stopTranscribingAsync(
           () => {
             clearTimeout(timeout);
-            this.isListening = false;
+            this._state = 'stopped';
             this.sessionStartTime = null;
-            console.log('Transcription stopped');
+            console.log('[STOP] Success - now stopped');
             resolve();
           },
           (error) => {
             clearTimeout(timeout);
-            console.error('Stop error:', error);
-            // Even on error, reset state to allow retry
-            this.isListening = false;
+            console.error('[STOP] Error, forcing stopped anyway:', error);
+            this._state = 'stopped';
             this.sessionStartTime = null;
-            reject(error);
+            resolve(); // Don't reject - we're stopped anyway
           }
         );
       });
     } catch (error) {
-      // Ensure state is reset even on error
-      this.isListening = false;
+      // On any error, force to stopped
+      console.error('[STOP] Error, forcing stopped state');
+      this._state = 'stopped';
       this.sessionStartTime = null;
-      throw error;
-    } finally {
-      this.isTransitioning = false;
     }
   }
 
@@ -327,7 +378,6 @@ export class SpeechRecognitionService {
    * Cleanup
    */
   destroy() {
-    // Stop health monitoring
     this.stopSessionHealthCheck();
     
     if (this.transcriber) {
@@ -338,12 +388,12 @@ export class SpeechRecognitionService {
       }
       this.transcriber = null;
     }
+    
     this.tokenManager.reset();
     this.resetSpeakers();
     this.lastInitialized = null;
     this.sessionStartTime = null;
-    this.isListening = false;
-    this.isTransitioning = false;
+    this._state = 'stopped';
   }
   
   /**
@@ -353,9 +403,8 @@ export class SpeechRecognitionService {
     const sessionDuration = this.sessionStartTime ? Date.now() - this.sessionStartTime : null;
     
     return {
+      state: this._state,
       hasTranscriber: !!this.transcriber,
-      isListening: this.isListening,
-      isTransitioning: this.isTransitioning,
       hasToken: !!this.tokenManager.token,
       tokenExpiringSoon: this.tokenManager.isExpiringSoon(),
       needsReinitialization: this.needsReinitialization(),
