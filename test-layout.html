@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Layout Test - 语音字幕</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #000;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dual Subtitle Container */
+    .subtitle-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .subtitle-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      overflow-y: auto;
+      border-bottom: 1px solid #333;
+      min-height: 0;
+    }
+
+    .subtitle-section:last-child {
+      border-bottom: none;
+    }
+
+    .subtitle-section.polished {
+      background: #0a0a0a;
+    }
+
+    .subtitle-label {
+      font-size: 14px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .subtitle-text {
+      font-size: 36px;
+      font-weight: bold;
+      line-height: 1.5;
+      text-align: center;
+      word-wrap: break-word;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Control Area */
+    .control-area {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      background: #111;
+      flex-shrink: 0;
+    }
+
+    .btn-start {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: none;
+      background: #27ae60;
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .status {
+      font-size: 16px;
+      color: #aaa;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .connection-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #666;
+      display: inline-block;
+    }
+
+    @media (max-width: 600px) {
+      .subtitle-text {
+        font-size: 28px;
+      }
+
+      .btn-start {
+        width: 80px;
+        height: 80px;
+        font-size: 18px;
+      }
+    }
+
+    /* Test info banner */
+    .test-banner {
+      background: #3498db;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="test-banner">
+    ✅ Layout Test - This is how the new dual display should look
+  </div>
+
+  <!-- Dual subtitle display -->
+  <div class="subtitle-container">
+    <!-- Raw subtitle (real-time) -->
+    <div class="subtitle-section">
+      <div class="subtitle-label">实时 (Real-time)</div>
+      <div class="subtitle-text">
+        A: 嗯...那个...我觉得...这个方案很好
+      </div>
+    </div>
+
+    <!-- Polished subtitle (cleaned) -->
+    <div class="subtitle-section polished">
+      <div class="subtitle-label">优化 (Polished)</div>
+      <div class="subtitle-text">
+        A: 我觉得 方案很好
+      </div>
+    </div>
+  </div>
+
+  <!-- Simplified control area -->
+  <div class="control-area">
+    <button class="btn-start">
+      开始
+    </button>
+    
+    <div class="status">
+      <span class="connection-indicator"></span>
+      <span>准备就绪</span>
+    </div>
+  </div>
+
+  <script>
+    // Simple demo to show text updates
+    const rawText = document.querySelector('.subtitle-section:first-child .subtitle-text');
+    const polishedText = document.querySelector('.subtitle-section.polished .subtitle-text');
+    const button = document.querySelector('.btn-start');
+    
+    const examples = [
+      {
+        raw: 'A: 嗯...那个...我觉得...这个方案很好',
+        polished: 'A: 我觉得 方案很好'
+      },
+      {
+        raw: 'B: 啊...就是...然后...我们可以试试',
+        polished: 'B: 我们可以试试'
+      },
+      {
+        raw: 'A: 其实其实其实...应该没问题',
+        polished: 'A: 应该没问题'
+      }
+    ];
+    
+    let index = 0;
+    
+    button.addEventListener('click', () => {
+      index = (index + 1) % examples.length;
+      rawText.textContent = examples[index].raw;
+      
+      // Simulate 500ms delay for polished text
+      setTimeout(() => {
+        polishedText.textContent = examples[index].polished;
+      }, 500);
+    });
+  </script>
+
+</body>
+</html>

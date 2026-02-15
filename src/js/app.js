@@ -164,29 +164,6 @@ export class App {
         await this.wakeLock.request();
       }
     });
-    
-    this.setupHelpModal();
-  }
-  
-  /**
-   * Setup help modal event handlers
-   */
-  setupHelpModal() {
-    const modal = document.getElementById('helpModal');
-    
-    // Close on ESC key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal.classList.contains('active')) {
-        this.toggleHelp();
-      }
-    });
-    
-    // Close on click outside
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        this.toggleHelp();
-      }
-    });
   }
 
   /**
