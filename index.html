@@ -33,7 +33,13 @@
   </div>
 
   <div class="control-area">
-    <button class="btn-start" id="btnStart" onclick="window.app.toggleListening()" aria-label="开始或停止语音识别">
+    <button 
+      class="btn-start" 
+      id="btnStart" 
+      onclick="window.app.toggleListening()" 
+      onmouseenter="window.app.prewarmSpeechService()"
+      ontouchstart="window.app.prewarmSpeechService()"
+      aria-label="开始或停止语音识别">
       开始
     </button>
     

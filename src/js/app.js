@@ -3,7 +3,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { NetworkError, parseError } from './errors.js';
+import { NetworkError, parseError, SessionTimeoutError } from './errors.js';
 import { vibrate } from './utils.js';
 import SpeechRecognitionService from './speech-recognition.js';
 import UIController from './ui-controller.js';
@@ -18,10 +18,54 @@ export class App {
     this.networkMonitor = new NetworkMonitor();
     
     this.isListening = false;
+    this.isPrewarming = false;
     
     this.setupEventHandlers();
     this.setupNetworkMonitoring();
     this.setupVisibilityHandling();
+    
+    // Preload token in background for faster startup
+    this.preloadToken();
+  }
+  
+  /**
+   * Preload token in background to speed up first start
+   * Failures are non-critical - token will be fetched on demand
+   */
+  async preloadToken() {
+    try {
+      await this.speechService.tokenManager.getToken();
+      console.log('Token preloaded successfully');
+    } catch (error) {
+      // Non-critical failure - log but don't alert user
+      console.warn('Token preload failed (will retry on start):', error);
+    }
+  }
+  
+  /**
+   * Pre-initialize speech service for instant start
+   * This is an optimization - failures are handled gracefully
+   */
+  async prewarmSpeechService() {
+    // Prevent multiple simultaneous prewarm attempts
+    if (this.isPrewarming || this.isListening) {
+      return;
+    }
+    
+    this.isPrewarming = true;
+    
+    try {
+      // Only prewarm if we don't have a transcriber or it needs refresh
+      if (this.speechService.needsReinitialization()) {
+        await this.speechService.ensureFreshTranscriber();
+        console.log('Speech service pre-initialized');
+      }
+    } catch (error) {
+      // Non-critical failure - start() will handle initialization
+      console.warn('Speech service prewarm failed (will initialize on start):', error);
+    } finally {
+      this.isPrewarming = false;
+    }
   }
 
   /**
@@ -54,8 +98,16 @@ export class App {
 
     // Error handling
     this.speechService.onError = (error) => {
-      this.ui.showError(error);
-      this.stop();
+      const parsedError = parseError(error);
+      
+      // Special handling for session timeout - auto restart
+      if (parsedError.type === 'session-timeout') {
+        console.log('Session timeout detected, auto-restarting...');
+        this.handleSessionTimeout();
+      } else {
+        this.ui.showError(parsedError);
+        this.stop();
+      }
     };
 
     // Session events
@@ -66,6 +118,41 @@ export class App {
     this.speechService.onSessionStopped = () => {
       console.log('Session stopped');
     };
+    
+    // Session expiring warning
+    this.speechService.onSessionExpiring = () => {
+      console.log('Session expiring soon, will auto-restart');
+      // Could show a brief notification to user if desired
+    };
+  }
+  
+  /**
+   * Handle session timeout with automatic restart
+   */
+  async handleSessionTimeout() {
+    try {
+      // Show brief message
+      this.ui.updateStatus('🔄 重新连接中...');
+      
+      // Stop current session
+      await this.speechService.stop();
+      
+      // Brief pause to ensure clean state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Restart automatically
+      await this.speechService.start();
+      
+      this.ui.updateStatus('🎤 正在听...');
+      console.log('Session restarted successfully after timeout');
+      
+    } catch (error) {
+      console.error('Failed to restart after session timeout:', error);
+      const parsedError = parseError(error);
+      this.ui.showError(parsedError);
+      this.isListening = false;
+      this.ui.updateButton(false);
+    }
   }
 
   /**
@@ -126,6 +213,12 @@ export class App {
   async toggleListening() {
     vibrate();
     
+    // Prevent rapid clicking
+    if (this.speechService.isTransitioning) {
+      console.log('Operation in progress, ignoring click');
+      return;
+    }
+    
     if (this.isListening) {
       await this.stop();
     } else {
@@ -143,7 +236,9 @@ export class App {
       return;
     }
 
-    this.ui.showLoading('正在初始化...');
+    // Show appropriate loading message
+    const needsInit = this.speechService.needsReinitialization();
+    this.ui.showLoading(needsInit ? '正在初始化...' : '正在启动...');
     
     // Reset speaker mapping
     this.speechService.resetSpeakers();
@@ -165,6 +260,16 @@ export class App {
       const parsedError = parseError(error);
       this.ui.showError(parsedError);
       this.ui.hideLoading();
+      
+      // Clean up on error to ensure fresh start next time
+      try {
+        if (this.speechService.transcriber) {
+          this.speechService.transcriber.close();
+          this.speechService.transcriber = null;
+        }
+      } catch (cleanupError) {
+        console.warn('Cleanup error:', cleanupError);
+      }
     }
   }
 
@@ -173,6 +278,13 @@ export class App {
    */
   async stop() {
     console.log('=== STOP CALLED ===');
+    
+    // Prevent double-stop
+    if (!this.isListening) {
+      console.log('Already stopped, ignoring');
+      return;
+    }
+    
     try {
       // Set flag first to prevent event handlers from updating UI
       this.isListening = false;
@@ -187,23 +299,31 @@ export class App {
       this.ui.updateStatus('已停止');
       console.log('Status updated');
       
-      // Clear subtitle and show default message immediately
-      console.log('About to reset subtitle...');
+      // Clear subtitle and show default message
       this.ui.updateSubtitle('点击下方按钮开始', '');
       console.log('Subtitle reset completed');
-      
-      // Also try with a delay to see if something overwrites it
-      setTimeout(() => {
-        console.log('Delayed subtitle reset...');
-        this.ui.updateSubtitle('点击下方按钮开始', '');
-        console.log('Delayed subtitle reset completed');
-      }, 200);
       
       // Release wake lock
       await this.wakeLock.release();
       
     } catch (error) {
       console.error('Stop error:', error);
+      
+      // Force state reset even on error
+      this.isListening = false;
+      this.ui.updateButton(false);
+      this.ui.updateStatus('已停止 (出错)');
+      this.ui.updateSubtitle('点击下方按钮开始', '');
+      
+      // Try to clean up transcriber
+      try {
+        if (this.speechService.transcriber) {
+          this.speechService.transcriber.close();
+          this.speechService.transcriber = null;
+        }
+      } catch (cleanupError) {
+        console.warn('Cleanup error:', cleanupError);
+      }
     }
   }
 

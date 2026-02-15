@@ -54,6 +54,12 @@ export class UnknownError extends AppError {
   }
 }
 
+export class SessionTimeoutError extends AppError {
+  constructor() {
+    super('会话时间过长，正在重新连接...', 'session-timeout');
+  }
+}
+
 /**
  * Error Messages Dictionary
  */
@@ -64,6 +70,7 @@ export const ERROR_MESSAGES = {
   token: '⚠️ 连接服务失败，请稍后重试',
   init: '⚠️ 初始化失败，请刷新页面重试',
   start: '⚠️ 启动失败，请重新开始',
+  'session-timeout': 'ℹ️ 会话时间过长，正在重新连接...',
   unknown: '⚠️ 出错了，请重新开始'
 };
 
@@ -93,6 +100,10 @@ export function parseError(error) {
 
   if (errorString.includes('token') || error?.message === 'token') {
     return new TokenError();
+  }
+  
+  if (errorString.includes('session') || error?.type === 'session-timeout') {
+    return new SessionTimeoutError();
   }
 
   return new UnknownError(error);
