@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v1';
+const CACHE_NAME = 'voice-subtitle-v2'; // Updated version to force cache refresh
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -24,6 +24,7 @@ const ASSETS_TO_CACHE = [
   '/src/js/network-monitor.js',
   '/src/js/speech-recognition.js',
   '/src/js/ui-controller.js',
+  '/src/js/text-polisher.js', // Added new file
   '/src/js/app.js',
   '/src/js/stats-page.js'
 ];
