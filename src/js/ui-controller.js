@@ -5,37 +5,30 @@
 import { CONFIG } from './config.js';
 import { ERROR_MESSAGES } from './errors.js';
 import { vibrate, formatTime, storage, createElement } from './utils.js';
+import TextPolisher from './text-polisher.js';
 
 export class UIController {
   constructor() {
     this.elements = {
       subtitleText: document.getElementById('subtitleText'),
+      polishedText: document.getElementById('polishedText'),
       btnStart: document.getElementById('btnStart'),
       statusText: document.getElementById('statusText'),
       connectionIndicator: document.getElementById('connectionIndicator'),
-      history: document.getElementById('history'),
-      networkStatus: document.getElementById('networkStatus'),
-      fontSizeDisplay: document.getElementById('fontSizeDisplay')
+      networkStatus: document.getElementById('networkStatus')
     };
     
-    this.fontSize = storage.get(CONFIG.STORAGE_KEYS.FONT_SIZE, CONFIG.FONT_SIZE.DEFAULT);
-    this.sessionStartTime = null;
-    this.sessionDurationTimer = null;
-    this.applyFontSize();
+    this.textPolisher = new TextPolisher();
+    this.polishTimer = null;
   }
 
   /**
-   * Update subtitle text
+   * Update subtitle text (raw, real-time)
    */
   updateSubtitle(speaker, text, isRecognizing = false) {
-    console.log('updateSubtitle called:', { speaker, text, isRecognizing });
-    
     if (!text) {
-      // If no text provided, clear subtitle
       const newText = speaker || '点击下方按钮开始';
-      console.log('Setting subtitle to:', newText);
       this.elements.subtitleText.textContent = newText;
-      console.log('Subtitle element textContent is now:', this.elements.subtitleText.textContent);
       return;
     }
     
@@ -46,6 +39,39 @@ export class UIController {
         `<span class="recognizing">${displayText}</span>`;
     } else {
       this.elements.subtitleText.textContent = displayText;
+      
+      // Add to polisher buffer and update polished text
+      this.textPolisher.addText(speaker, text);
+      this.schedulePolishUpdate();
+    }
+  }
+  
+  /**
+   * Schedule polished text update (debounced)
+   */
+  schedulePolishUpdate() {
+    if (this.polishTimer) {
+      clearTimeout(this.polishTimer);
+    }
+    
+    // Update polished text after 500ms of no new text
+    this.polishTimer = setTimeout(() => {
+      const polished = this.textPolisher.polish();
+      if (polished) {
+        this.elements.polishedText.textContent = polished;
+      }
+    }, 500);
+  }
+  
+  /**
+   * Reset polished text
+   */
+  resetPolishedText() {
+    this.textPolisher.reset();
+    this.elements.polishedText.textContent = '等待中...';
+    if (this.polishTimer) {
+      clearTimeout(this.polishTimer);
+      this.polishTimer = null;
     }
   }
 
@@ -57,6 +83,7 @@ export class UIController {
     
     const message = ERROR_MESSAGES[error.type] || ERROR_MESSAGES.unknown;
     this.elements.subtitleText.textContent = message;
+    this.elements.polishedText.textContent = '';
     this.elements.statusText.textContent = '❌ ' + error.message;
     this.updateConnectionStatus('disconnected');
   }
@@ -78,44 +105,6 @@ export class UIController {
     } else if (state === 'reconnecting') {
       this.elements.connectionIndicator.classList.add('reconnecting');
     }
-  }
-  
-  /**
-   * Update session duration display
-   */
-  updateSessionDuration() {
-    if (!this.sessionStartTime) return;
-    
-    const duration = Math.floor((Date.now() - this.sessionStartTime) / 1000);
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    
-    if (minutes > 0) {
-      this.elements.statusText.textContent = 
-        `🎤 正在听... (${minutes}:${seconds.toString().padStart(2, '0')})`;
-    }
-  }
-  
-  /**
-   * Start session duration timer
-   */
-  startSessionDurationTimer() {
-    this.sessionStartTime = Date.now();
-    if (this.sessionDurationTimer) {
-      clearInterval(this.sessionDurationTimer);
-    }
-    this.sessionDurationTimer = setInterval(() => this.updateSessionDuration(), 1000);
-  }
-  
-  /**
-   * Stop session duration timer
-   */
-  stopSessionDurationTimer() {
-    if (this.sessionDurationTimer) {
-      clearInterval(this.sessionDurationTimer);
-      this.sessionDurationTimer = null;
-    }
-    this.sessionStartTime = null;
   }
 
   /**
@@ -171,53 +160,11 @@ export class UIController {
   }
 
   /**
-   * Add to history
-   */
-  addToHistory(text) {
-    if (!text.trim()) return;
-    
-    const time = formatTime();
-    const item = createElement('div', {
-      textContent: `[${time}] ${text}`,
-      className: 'history-item'
-    });
-    
-    this.elements.history.insertBefore(item, this.elements.history.firstChild);
-    
-    // Keep only last N items
-    while (this.elements.history.children.length > CONFIG.HISTORY_MAX_ITEMS) {
-      this.elements.history.removeChild(this.elements.history.lastChild);
-    }
-  }
-
-  /**
-   * Change font size
-   */
-  changeFontSize(delta) {
-    vibrate();
-    
-    this.fontSize = Math.max(
-      CONFIG.FONT_SIZE.MIN,
-      Math.min(CONFIG.FONT_SIZE.MAX, this.fontSize + delta)
-    );
-    
-    this.applyFontSize();
-    storage.set(CONFIG.STORAGE_KEYS.FONT_SIZE, this.fontSize);
-  }
-
-  /**
-   * Apply font size
-   */
-  applyFontSize() {
-    this.elements.subtitleText.style.fontSize = this.fontSize + 'px';
-    this.elements.fontSizeDisplay.textContent = this.fontSize + 'px';
-  }
-
-  /**
    * Reset UI to initial state
    */
   reset() {
     this.updateSubtitle('', '点击下方按钮开始');
+    this.resetPolishedText();
     this.updateStatus('准备就绪');
     this.updateButton(false);
     this.setButtonEnabled(true);

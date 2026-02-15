@@ -75,9 +75,7 @@ export class App {
     this.speechService.onTranscribed = (speaker, text, isRecognizing) => {
       // Only update if actually listening (check service state)
       if (this.speechService.isListening) {
-        const line = `${speaker}: ${text}`;
         this.ui.updateSubtitle(speaker, text, isRecognizing);
-        this.ui.addToHistory(line);
       }
     };
 
@@ -229,8 +227,9 @@ export class App {
     const needsInit = this.speechService.needsReinitialization();
     this.ui.showLoading(needsInit ? '正在初始化...' : '正在启动...');
     
-    // Reset speaker mapping
+    // Reset speaker mapping and polished text
     this.speechService.resetSpeakers();
+    this.ui.resetPolishedText();
 
     try {
       await this.speechService.start();
@@ -271,6 +270,7 @@ export class App {
       this.ui.updateButton(false);
       this.ui.updateStatus('已停止');
       this.ui.updateSubtitle('点击下方按钮开始', '');
+      this.ui.resetPolishedText();
       
       // Release wake lock
       await this.wakeLock.release();
@@ -285,36 +285,7 @@ export class App {
       this.ui.updateButton(false);
       this.ui.updateStatus('已停止');
       this.ui.updateSubtitle('点击下方按钮开始', '');
-    }
-  }
-
-  /**
-   * Change font size
-   */
-  changeFontSize(delta) {
-    this.ui.changeFontSize(delta);
-  }
-  
-  /**
-   * Toggle help modal
-   */
-  toggleHelp() {
-    vibrate();
-    
-    const modal = document.getElementById('helpModal');
-    const iframe = document.getElementById('helpFrame');
-    const body = document.body;
-    
-    if (modal.classList.contains('active')) {
-      // Close modal
-      modal.classList.remove('active');
-      body.classList.remove('modal-open');
-      iframe.src = ''; // Clear iframe to stop any activity
-    } else {
-      // Open modal
-      iframe.src = '/help.html';
-      modal.classList.add('active');
-      body.classList.add('modal-open');
+      this.ui.resetPolishedText();
     }
   }
 
