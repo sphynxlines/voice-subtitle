@@ -16,12 +16,10 @@ export class App {
     this.ui = new UIController();
     this.wakeLock = new WakeLockManager();
     this.networkMonitor = new NetworkMonitor();
-    this.isPreloading = false; // Guard against multiple preloads
     
     this.setupEventHandlers();
     this.setupNetworkMonitoring();
     this.setupVisibilityHandling();
-    this.setupButtonListener(); // Add direct button listener
     
     // Preload token in background for faster startup
     this.preloadToken();
@@ -32,22 +30,12 @@ export class App {
    * Failures are non-critical - token will be fetched on demand
    */
   async preloadToken() {
-    // Prevent multiple simultaneous preloads
-    if (this.isPreloading) {
-      console.log('Token preload already in progress');
-      return;
-    }
-    
-    this.isPreloading = true;
-    
     try {
       await this.speechService.tokenManager.getToken();
       console.log('Token preloaded successfully');
     } catch (error) {
       // Non-critical failure - log but don't alert user
       console.warn('Token preload failed (will retry on start):', error);
-    } finally {
-      this.isPreloading = false;
     }
   }
   
@@ -72,28 +60,6 @@ export class App {
   }
 
   /**
-   * Setup direct button listener as backup
-   */
-  setupButtonListener() {
-    const btnStart = document.getElementById('btnStart');
-    if (btnStart) {
-      // Add event listener as backup (in addition to inline onclick)
-      btnStart.addEventListener('click', () => {
-        console.log('[BUTTON] Direct listener triggered');
-        this.toggleListening();
-      });
-      
-      // Add hover/touch prewarm listeners
-      btnStart.addEventListener('mouseenter', () => this.prewarmSpeechService());
-      btnStart.addEventListener('touchstart', () => this.prewarmSpeechService(), { passive: true });
-      
-      console.log('[BUTTON] Direct listeners attached');
-    } else {
-      console.error('[BUTTON] btnStart element not found!');
-    }
-  }
-
-  /**
    * Setup speech service event handlers
    */
   setupEventHandlers() {
@@ -109,7 +75,9 @@ export class App {
     this.speechService.onTranscribed = (speaker, text, isRecognizing) => {
       // Only update if actually listening (check service state)
       if (this.speechService.isListening) {
+        const line = `${speaker}: ${text}`;
         this.ui.updateSubtitle(speaker, text, isRecognizing);
+        this.ui.addToHistory(line);
       }
     };
 
@@ -198,6 +166,29 @@ export class App {
         await this.wakeLock.request();
       }
     });
+    
+    this.setupHelpModal();
+  }
+  
+  /**
+   * Setup help modal event handlers
+   */
+  setupHelpModal() {
+    const modal = document.getElementById('helpModal');
+    
+    // Close on ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('active')) {
+        this.toggleHelp();
+      }
+    });
+    
+    // Close on click outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.toggleHelp();
+      }
+    });
   }
 
   /**
@@ -244,8 +235,6 @@ export class App {
     try {
       await this.speechService.start();
       
-      console.log('[APP START] Speech service started, updating UI');
-      
       // Update UI based on actual service state
       this.ui.updateButton(true);
       this.ui.updateStatus('🎤 正在听...');
@@ -255,7 +244,7 @@ export class App {
       // Enable wake lock
       await this.wakeLock.request();
       
-      console.log('[APP START] Success - state:', this.speechService.state);
+      console.log('[APP START] Success');
       
     } catch (error) {
       console.error('[APP START] Error:', error);
@@ -286,9 +275,6 @@ export class App {
       // Release wake lock
       await this.wakeLock.release();
       
-      // Generate summary if there's conversation
-      await this.ui.showSummary();
-      
       console.log('[APP STOP] Success');
       
     } catch (error) {
@@ -303,6 +289,36 @@ export class App {
   }
 
   /**
+   * Change font size
+   */
+  changeFontSize(delta) {
+    this.ui.changeFontSize(delta);
+  }
+  
+  /**
+   * Toggle help modal
+   */
+  toggleHelp() {
+    vibrate();
+    
+    const modal = document.getElementById('helpModal');
+    const iframe = document.getElementById('helpFrame');
+    const body = document.body;
+    
+    if (modal.classList.contains('active')) {
+      // Close modal
+      modal.classList.remove('active');
+      body.classList.remove('modal-open');
+      iframe.src = ''; // Clear iframe to stop any activity
+    } else {
+      // Open modal
+      iframe.src = '/help.html';
+      modal.classList.add('active');
+      body.classList.add('modal-open');
+    }
+  }
+
+  /**
    * Cleanup
    */
   destroy() {
@@ -313,40 +329,15 @@ export class App {
 
 // Initialize app when DOM is ready
 let app;
-let isInitializing = false;
-
-function initializeApp() {
-  // Prevent multiple initializations
-  if (isInitializing || app) {
-    console.log('[INIT] Already initialized or initializing, skipping');
-    return;
-  }
-  
-  isInitializing = true;
-  
-  try {
-    console.log('[INIT] Starting app initialization...');
-    app = new App();
-    window.app = app; // Expose for inline event handlers
-    console.log('[INIT] App initialized successfully');
-    console.log('[INIT] window.app exists:', !!window.app);
-    console.log('[INIT] toggleListening exists:', typeof window.app?.toggleListening);
-  } catch (error) {
-    console.error('[INIT] Failed to initialize app:', error);
-    // Show error to user
-    const statusEl = document.getElementById('statusText');
-    if (statusEl) {
-      statusEl.textContent = '初始化失败: ' + error.message;
-    }
-  } finally {
-    isInitializing = false;
-  }
-}
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeApp);
+  document.addEventListener('DOMContentLoaded', () => {
+    app = new App();
+    window.app = app; // Expose for inline event handlers
+  });
 } else {
-  initializeApp();
+  app = new App();
+  window.app = app;
 }
 
 export default App;

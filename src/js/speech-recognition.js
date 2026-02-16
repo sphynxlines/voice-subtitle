@@ -77,28 +77,9 @@ export class SpeechRecognitionService {
       const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
       speechConfig.speechRecognitionLanguage = CONFIG.SPEECH.LANGUAGE;
       
-      // Configure for continuous recognition
-      speechConfig.setProperty(
-        SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,
-        "15000"
-      );
-      
-      // Disable speech context to avoid websocket errors
-      speechConfig.setProperty(
-        SpeechSDK.PropertyId.SpeechServiceConnection_EnableAudioLogging,
-        "false"
-      );
-      
-      // Set endpoint silence timeout
-      speechConfig.setProperty(
-        SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
-        "3000"
-      );
-      
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       
-      // Use SpeechRecognizer for simpler setup
-      this.transcriber = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+      this.transcriber = new SpeechSDK.ConversationTranscriber(speechConfig, audioConfig);
       
       this.setupEventHandlers();
       
@@ -163,17 +144,17 @@ export class SpeechRecognitionService {
    */
   setupEventHandlers() {
     // Real-time transcription (while speaking)
-    this.transcriber.recognizing = (s, e) => {
+    this.transcriber.transcribing = (s, e) => {
       if (e.result.text && this.onTranscribing) {
-        const speaker = this.getSpeakerLabel(e.result.speakerId || 'default');
+        const speaker = this.getSpeakerLabel(e.result.speakerId);
         this.onTranscribing(speaker, e.result.text, true);
       }
     };
 
     // Final transcription (sentence complete)
-    this.transcriber.recognized = (s, e) => {
+    this.transcriber.transcribed = (s, e) => {
       if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && this.onTranscribed) {
-        const speaker = this.getSpeakerLabel(e.result.speakerId || 'default');
+        const speaker = this.getSpeakerLabel(e.result.speakerId);
         this.onTranscribed(speaker, e.result.text, false);
       }
     };
@@ -243,13 +224,13 @@ export class SpeechRecognitionService {
       // Ensure fresh transcriber
       await this.ensureFreshTranscriber();
 
-      // Start continuous recognition
+      // Start transcribing
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('Start timeout'));
         }, 10000); // 10 second timeout
         
-        this.transcriber.startContinuousRecognitionAsync(
+        this.transcriber.startTranscribingAsync(
           () => {
             clearTimeout(timeout);
             this._state = 'listening';
@@ -352,7 +333,7 @@ export class SpeechRecognitionService {
         return;
       }
 
-      // Stop continuous recognition with timeout
+      // Stop transcribing with timeout
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           console.warn('[STOP] Timeout, forcing stopped');
@@ -361,7 +342,7 @@ export class SpeechRecognitionService {
           resolve();
         }, 5000); // 5 second timeout
         
-        this.transcriber.stopContinuousRecognitionAsync(
+        this.transcriber.stopTranscribingAsync(
           () => {
             clearTimeout(timeout);
             this._state = 'stopped';

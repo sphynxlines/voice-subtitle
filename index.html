@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>语音字幕</title>
 
   <link rel="manifest" href="/manifest.json">
@@ -26,29 +26,19 @@
     ⚠️ 网络已断开
   </div>
 
-  <!-- Single subtitle display -->
-  <div class="subtitle-container">
+  <div class="subtitle-area">
     <div class="subtitle-text" id="subtitleText">
       点击下方按钮开始
     </div>
   </div>
 
-  <!-- History section -->
-  <div class="history-section" id="historySection">
-    <div class="history-header">
-      <span>历史记录</span>
-      <button class="btn-clear-history" id="btnClearHistory" aria-label="清除历史">
-        清除
-      </button>
-    </div>
-    <div class="history-list" id="historyList"></div>
-  </div>
-
-  <!-- Simplified control area -->
   <div class="control-area">
     <button 
       class="btn-start" 
       id="btnStart" 
+      onclick="window.app.toggleListening()" 
+      onmouseenter="window.app.prewarmSpeechService()"
+      ontouchstart="window.app.prewarmSpeechService()"
       aria-label="开始或停止语音识别">
       开始
     </button>
@@ -56,6 +46,23 @@
     <div class="status" id="status" role="status" aria-live="polite">
       <span class="connection-indicator" id="connectionIndicator"></span>
       <span id="statusText">准备就绪</span>
+    </div>
+    
+    <div class="font-control">
+      <button class="btn-font" onclick="window.app.changeFontSize(-8)" aria-label="减小字体">A-</button>
+      <span id="fontSizeDisplay" aria-label="当前字体大小">48px</span>
+      <button class="btn-font" onclick="window.app.changeFontSize(8)" aria-label="增大字体">A+</button>
+      <button class="help-link" onclick="window.app.toggleHelp()" title="帮助" aria-label="查看帮助">?</button>
+    </div>
+
+    <div class="history" id="history" role="log" aria-label="历史记录"></div>
+  </div>
+
+  <!-- Help Modal -->
+  <div class="help-modal" id="helpModal">
+    <div class="help-modal-content">
+      <button class="help-modal-close" onclick="window.app.toggleHelp()" aria-label="关闭帮助">&times;</button>
+      <iframe id="helpFrame" src="" title="帮助内容"></iframe>
     </div>
   </div>
 
@@ -66,62 +73,15 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        // Simple registration without aggressive unregistration
         navigator.serviceWorker.register('/sw.js')
-          .then(reg => {
-            console.log('Service Worker registered');
-            
-            // Check for updates but don't force reload
-            reg.addEventListener('updatefound', () => {
-              const newWorker = reg.installing;
-              console.log('Service Worker update found');
-              
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'activated' && !navigator.serviceWorker.controller) {
-                  // Only reload if this is the first activation
-                  console.log('First service worker activation');
-                  window.location.reload();
-                }
-              });
-            });
-          })
-          .catch(err => {
-            console.log('Service Worker registration failed:', err);
-          });
+          .then(reg => console.log('Service Worker registered'))
+          .catch(err => console.log('Service Worker registration failed:', err));
       });
     }
   </script>
   
   <!-- Application -->
-  <script type="module">
-    // Error handler for module loading
-    window.addEventListener('error', (e) => {
-      console.error('Global error:', e.error || e.message);
-      const statusEl = document.getElementById('statusText');
-      if (statusEl) {
-        statusEl.textContent = '❌ 加载失败: ' + (e.error?.message || e.message);
-      }
-    });
-
-    // Import and verify app loads
-    import('./src/js/app.js')
-      .then(() => {
-        console.log('✅ App module loaded');
-        // Wait a bit for initialization
-        setTimeout(() => {
-          if (!window.app) {
-            console.error('❌ window.app not set after module load');
-            document.getElementById('statusText').textContent = '❌ 应用初始化失败';
-          } else {
-            console.log('✅ window.app ready');
-          }
-        }, 100);
-      })
-      .catch(err => {
-        console.error('❌ Failed to load app module:', err);
-        document.getElementById('statusText').textContent = '❌ 模块加载失败: ' + err.message;
-      });
-  </script>
+  <script type="module" src="/src/js/app.js"></script>
 
 </body>
 </html>

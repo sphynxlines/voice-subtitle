@@ -4,8 +4,7 @@
 
 import { CONFIG } from './config.js';
 import { ERROR_MESSAGES } from './errors.js';
-import { vibrate, formatTime } from './utils.js';
-import GroqClient from './groq-client.js';
+import { vibrate, formatTime, storage, createElement } from './utils.js';
 
 export class UIController {
   constructor() {
@@ -14,39 +13,31 @@ export class UIController {
       btnStart: document.getElementById('btnStart'),
       statusText: document.getElementById('statusText'),
       connectionIndicator: document.getElementById('connectionIndicator'),
+      history: document.getElementById('history'),
       networkStatus: document.getElementById('networkStatus'),
-      historyList: document.getElementById('historyList'),
-      btnClearHistory: document.getElementById('btnClearHistory')
+      fontSizeDisplay: document.getElementById('fontSizeDisplay')
     };
     
-    this.groqClient = new GroqClient();
-    this.transcript = []; // Store full conversation
-    this.setupHistoryHandlers();
+    this.fontSize = storage.get(CONFIG.STORAGE_KEYS.FONT_SIZE, CONFIG.FONT_SIZE.DEFAULT);
+    this.sessionStartTime = null;
+    this.sessionDurationTimer = null;
+    this.applyFontSize();
   }
 
   /**
-   * Setup history event handlers
-   */
-  setupHistoryHandlers() {
-    if (this.elements.btnClearHistory) {
-      this.elements.btnClearHistory.addEventListener('click', () => {
-        this.clearHistory();
-      });
-    }
-  }
-
-  /**
-   * Update subtitle text (real-time)
+   * Update subtitle text
    */
   updateSubtitle(speaker, text, isRecognizing = false) {
+    console.log('updateSubtitle called:', { speaker, text, isRecognizing });
+    
     if (!text) {
+      // If no text provided, clear subtitle
       const newText = speaker || '点击下方按钮开始';
+      console.log('Setting subtitle to:', newText);
       this.elements.subtitleText.textContent = newText;
+      console.log('Subtitle element textContent is now:', this.elements.subtitleText.textContent);
       return;
     }
-    
-    // Don't add placeholder text to transcript
-    const isPlaceholder = text === '正在听...' || text === '点击下方按钮开始';
     
     const displayText = speaker ? `${speaker}: ${text}` : text;
     
@@ -55,103 +46,6 @@ export class UIController {
         `<span class="recognizing">${displayText}</span>`;
     } else {
       this.elements.subtitleText.textContent = displayText;
-      
-      // Only add real speech to transcript and history (not placeholders)
-      if (!isPlaceholder && speaker) {
-        this.addToTranscript(speaker, text);
-        this.addToHistory(speaker, text);
-      }
-    }
-  }
-
-  /**
-   * Add to transcript (for summarization)
-   */
-  addToTranscript(speaker, text) {
-    this.transcript.push({
-      speaker,
-      text,
-      timestamp: Date.now()
-    });
-  }
-
-  /**
-   * Add to history display
-   */
-  addToHistory(speaker, text) {
-    const historyItem = document.createElement('div');
-    historyItem.className = 'history-item';
-    
-    const time = new Date().toLocaleTimeString('zh-CN', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-    
-    historyItem.innerHTML = `
-      <div>
-        <span class="history-item-speaker">${speaker}:</span>
-        <span class="history-item-text">${text}</span>
-      </div>
-      <div class="history-item-time">${time}</div>
-    `;
-    
-    this.elements.historyList.appendChild(historyItem);
-    
-    // Auto-scroll to bottom
-    this.elements.historyList.scrollTop = this.elements.historyList.scrollHeight;
-    
-    // Limit history items (keep last 50)
-    const items = this.elements.historyList.children;
-    if (items.length > 50) {
-      this.elements.historyList.removeChild(items[0]);
-    }
-  }
-
-  /**
-   * Clear history
-   */
-  clearHistory() {
-    this.elements.historyList.innerHTML = '';
-    this.transcript = [];
-    // Reset subtitle to default
-    this.elements.subtitleText.textContent = '点击下方按钮开始';
-  }
-
-  /**
-   * Generate and show summary
-   */
-  async showSummary() {
-    // Check if summary feature is enabled
-    if (!CONFIG.FEATURES.ENABLE_SUMMARY) {
-      console.log('[SUMMARY] Feature disabled in config');
-      return;
-    }
-
-    // Only show summary if there's actual conversation (not just placeholders)
-    if (this.transcript.length === 0) {
-      console.log('[SUMMARY] No transcript to summarize');
-      return;
-    }
-
-    console.log('[SUMMARY] Generating summary for', this.transcript.length, 'items');
-
-    // Show loading in main subtitle area
-    this.elements.subtitleText.innerHTML = 
-      '<span class="recognizing">📝 正在生成对话总结...</span>';
-
-    try {
-      const summary = await this.groqClient.summarize(this.transcript);
-      
-      // Show summary in main subtitle area
-      this.elements.subtitleText.innerHTML = `
-        <div style="font-size: 0.6em; color: #27ae60; margin-bottom: 10px;">📝 对话总结</div>
-        <div style="font-size: 0.7em; line-height: 1.5;">${summary}</div>
-      `;
-      
-    } catch (error) {
-      console.error('Failed to generate summary:', error);
-      this.elements.subtitleText.innerHTML = 
-        '<span style="color: #e74c3c;">总结生成失败: ' + error.message + '</span>';
     }
   }
 
@@ -184,6 +78,44 @@ export class UIController {
     } else if (state === 'reconnecting') {
       this.elements.connectionIndicator.classList.add('reconnecting');
     }
+  }
+  
+  /**
+   * Update session duration display
+   */
+  updateSessionDuration() {
+    if (!this.sessionStartTime) return;
+    
+    const duration = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    
+    if (minutes > 0) {
+      this.elements.statusText.textContent = 
+        `🎤 正在听... (${minutes}:${seconds.toString().padStart(2, '0')})`;
+    }
+  }
+  
+  /**
+   * Start session duration timer
+   */
+  startSessionDurationTimer() {
+    this.sessionStartTime = Date.now();
+    if (this.sessionDurationTimer) {
+      clearInterval(this.sessionDurationTimer);
+    }
+    this.sessionDurationTimer = setInterval(() => this.updateSessionDuration(), 1000);
+  }
+  
+  /**
+   * Stop session duration timer
+   */
+  stopSessionDurationTimer() {
+    if (this.sessionDurationTimer) {
+      clearInterval(this.sessionDurationTimer);
+      this.sessionDurationTimer = null;
+    }
+    this.sessionStartTime = null;
   }
 
   /**
@@ -239,10 +171,53 @@ export class UIController {
   }
 
   /**
+   * Add to history
+   */
+  addToHistory(text) {
+    if (!text.trim()) return;
+    
+    const time = formatTime();
+    const item = createElement('div', {
+      textContent: `[${time}] ${text}`,
+      className: 'history-item'
+    });
+    
+    this.elements.history.insertBefore(item, this.elements.history.firstChild);
+    
+    // Keep only last N items
+    while (this.elements.history.children.length > CONFIG.HISTORY_MAX_ITEMS) {
+      this.elements.history.removeChild(this.elements.history.lastChild);
+    }
+  }
+
+  /**
+   * Change font size
+   */
+  changeFontSize(delta) {
+    vibrate();
+    
+    this.fontSize = Math.max(
+      CONFIG.FONT_SIZE.MIN,
+      Math.min(CONFIG.FONT_SIZE.MAX, this.fontSize + delta)
+    );
+    
+    this.applyFontSize();
+    storage.set(CONFIG.STORAGE_KEYS.FONT_SIZE, this.fontSize);
+  }
+
+  /**
+   * Apply font size
+   */
+  applyFontSize() {
+    this.elements.subtitleText.style.fontSize = this.fontSize + 'px';
+    this.elements.fontSizeDisplay.textContent = this.fontSize + 'px';
+  }
+
+  /**
    * Reset UI to initial state
    */
   reset() {
-    this.elements.subtitleText.textContent = '点击下方按钮开始';
+    this.updateSubtitle('', '点击下方按钮开始');
     this.updateStatus('准备就绪');
     this.updateButton(false);
     this.setButtonEnabled(true);

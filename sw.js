@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v13'; // LLM disabled by default, improved error handling
+const CACHE_NAME = 'voice-subtitle-v14'; // Reverted to stable version before LLM
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -24,7 +24,6 @@ const ASSETS_TO_CACHE = [
   '/src/js/network-monitor.js',
   '/src/js/speech-recognition.js',
   '/src/js/ui-controller.js',
-  '/src/js/groq-client.js',
   '/src/js/app.js',
   '/src/js/stats-page.js'
 ];
