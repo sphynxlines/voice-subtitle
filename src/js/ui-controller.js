@@ -21,7 +21,11 @@ export class UIController {
     this.fontSize = storage.get(CONFIG.STORAGE_KEYS.FONT_SIZE, CONFIG.FONT_SIZE.DEFAULT);
     this.sessionStartTime = null;
     this.sessionDurationTimer = null;
-    this.applyFontSize();
+    
+    // Only apply font size if element exists
+    if (this.elements.fontSizeDisplay) {
+      this.applyFontSize();
+    }
   }
 
   /**
@@ -209,8 +213,12 @@ export class UIController {
    * Apply font size
    */
   applyFontSize() {
-    this.elements.subtitleText.style.fontSize = this.fontSize + 'px';
-    this.elements.fontSizeDisplay.textContent = this.fontSize + 'px';
+    if (this.elements.subtitleText) {
+      this.elements.subtitleText.style.fontSize = this.fontSize + 'px';
+    }
+    if (this.elements.fontSizeDisplay) {
+      this.elements.fontSizeDisplay.textContent = this.fontSize + 'px';
+    }
   }
 
   /**

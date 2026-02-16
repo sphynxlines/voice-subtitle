@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v14'; // Reverted to stable version before LLM
+const CACHE_NAME = 'voice-subtitle-v16'; // Optimized layout for mobile and large screens
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
