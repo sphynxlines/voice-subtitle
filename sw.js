@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v16'; // Optimized layout for mobile and large screens
+const CACHE_NAME = 'voice-subtitle-v17'; // Added SiliconFlow AI summarization
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -24,6 +24,7 @@ const ASSETS_TO_CACHE = [
   '/src/js/network-monitor.js',
   '/src/js/speech-recognition.js',
   '/src/js/ui-controller.js',
+  '/src/js/ai-client.js',
   '/src/js/app.js',
   '/src/js/stats-page.js'
 ];

@@ -58,7 +58,14 @@ export const CONFIG = {
     'voice.calm.rocks',
     'localhost',
     '127.0.0.1'
-  ]
+  ],
+
+  // Feature flags
+  FEATURES: {
+    // Enable/disable AI summarization
+    // Set to false to disable summary generation
+    ENABLE_SUMMARY: false  // Set to true when SILICONFLOW_API_KEY is configured
+  }
 };
 
 export default CONFIG;

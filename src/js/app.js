@@ -229,8 +229,9 @@ export class App {
     const needsInit = this.speechService.needsReinitialization();
     this.ui.showLoading(needsInit ? '正在初始化...' : '正在启动...');
     
-    // Reset speaker mapping
+    // Reset speaker mapping and transcript
     this.speechService.resetSpeakers();
+    this.ui.clearTranscript();
 
     try {
       await this.speechService.start();
@@ -270,10 +271,12 @@ export class App {
       // Update UI based on actual service state
       this.ui.updateButton(false);
       this.ui.updateStatus('已停止');
-      this.ui.updateSubtitle('点击下方按钮开始', '');
       
       // Release wake lock
       await this.wakeLock.release();
+      
+      // Generate AI summary if enabled
+      await this.ui.showSummary();
       
       console.log('[APP STOP] Success');
       

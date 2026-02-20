@@ -5,6 +5,7 @@
 import { CONFIG } from './config.js';
 import { ERROR_MESSAGES } from './errors.js';
 import { vibrate, formatTime, storage, createElement } from './utils.js';
+import AIClient from './ai-client.js';
 
 export class UIController {
   constructor() {
@@ -18,6 +19,8 @@ export class UIController {
       fontSizeDisplay: document.getElementById('fontSizeDisplay')
     };
     
+    this.aiClient = new AIClient();
+    this.transcript = []; // Store conversation for summarization
     this.fontSize = storage.get(CONFIG.STORAGE_KEYS.FONT_SIZE, CONFIG.FONT_SIZE.DEFAULT);
     this.sessionStartTime = null;
     this.sessionDurationTimer = null;
@@ -50,7 +53,70 @@ export class UIController {
         `<span class="recognizing">${displayText}</span>`;
     } else {
       this.elements.subtitleText.textContent = displayText;
+      
+      // Add to transcript for summarization (only final text, not recognizing)
+      if (speaker && text) {
+        this.transcript.push({
+          speaker,
+          text,
+          timestamp: Date.now()
+        });
+      }
     }
+  }
+
+  /**
+   * Generate and show AI summary
+   */
+  async showSummary() {
+    // Check if feature is enabled
+    if (!CONFIG.FEATURES.ENABLE_SUMMARY) {
+      console.log('[SUMMARY] Feature disabled in config');
+      return;
+    }
+
+    // Check if there's content to summarize
+    if (this.transcript.length === 0) {
+      console.log('[SUMMARY] No transcript to summarize');
+      return;
+    }
+
+    console.log('[SUMMARY] Generating summary for', this.transcript.length, 'items');
+
+    // Show loading state
+    this.elements.subtitleText.innerHTML = 
+      '<span class="recognizing">📝 正在生成对话总结...</span>';
+
+    try {
+      const summary = await this.aiClient.summarize(this.transcript);
+      
+      // Show summary
+      this.elements.subtitleText.innerHTML = `
+        <div style="font-size: 0.6em; color: #27ae60; margin-bottom: 10px;">📝 对话总结</div>
+        <div style="font-size: 0.7em; line-height: 1.5;">${summary}</div>
+      `;
+      
+      console.log('[SUMMARY] Success');
+      
+    } catch (error) {
+      console.error('[SUMMARY] Failed:', error);
+      
+      // Show error briefly, then return to default
+      this.elements.subtitleText.innerHTML = 
+        `<span style="color: #e74c3c;">总结生成失败: ${error.message}</span>`;
+      
+      // Return to default after 3 seconds
+      setTimeout(() => {
+        this.elements.subtitleText.textContent = '点击下方按钮开始';
+      }, 3000);
+    }
+  }
+
+  /**
+   * Clear transcript
+   */
+  clearTranscript() {
+    this.transcript = [];
   }
 
   /**

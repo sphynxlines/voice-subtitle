@@ -5,6 +5,20 @@
 AZURE_KEY=your_azure_speech_key_here
 AZURE_REGION=eastus
 
+# AI Provider Selection (optional, defaults to SILICONFLOW)
+# Options: SILICONFLOW, GROQ
+AI_PROVIDER=SILICONFLOW
+
+# SiliconFlow API Key (for AI summarization)
+# Get from: https://cloud.siliconflow.cn/account/ak
+# China-friendly, good for production
+SILICONFLOW_API_KEY=your_siliconflow_api_key_here
+
+# Groq API Key (alternative AI provider)
+# Get from: https://console.groq.com/keys
+# Fast inference, may be blocked in some regions
+GROQ_API_KEY=your_groq_api_key_here
+
 # These are automatically provided by Cloudflare Pages in production
 # For local testing, you can leave these empty (rate limiting will be disabled)
 # RATE_LIMIT=

@@ -8,7 +8,10 @@
     "dev:mock": "node local-server.js",
     "test": "node test-button-fix.html",
     "deploy": "wrangler pages deploy .",
-    "preview": "wrangler pages dev . --port 8000"
+    "preview": "wrangler pages dev . --port 8000",
+    "check-env": "node check-env.js",
+    "test-ai": "node test-siliconflow.js",
+    "test-provider": "node test-ai-provider.js"
   },
   "keywords": [
     "speech",

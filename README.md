@@ -43,10 +43,33 @@ See [QUICK_START.md](QUICK_START.md) for more options.
 
 ## Documentation
 
+### Getting Started
 - [QUICK_START.md](QUICK_START.md) - Quick reference guide
+- [SETUP_CHECKLIST.md](SETUP_CHECKLIST.md) - Step-by-step setup checklist
 - [LOCAL_DEV_GUIDE.md](LOCAL_DEV_GUIDE.md) - Comprehensive development & testing
+
+### AI Summarization
+- [AI_SUMMARY_SETUP.md](AI_SUMMARY_SETUP.md) - Complete AI setup guide
+- [README_CLOUDFLARE.md](README_CLOUDFLARE.md) - Quick Cloudflare setup (5 min)
+- [CLOUDFLARE_ENV_SETUP.md](CLOUDFLARE_ENV_SETUP.md) - Detailed Cloudflare guide
+
+### Architecture & Troubleshooting
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and data flow
+- [CLOUDFLARE_REGION_ROUTING.md](CLOUDFLARE_REGION_ROUTING.md) - Region routing configuration
+- [SETUP_SMART_PLACEMENT.md](SETUP_SMART_PLACEMENT.md) - Quick Smart Placement setup
+- [API_KEY_TROUBLESHOOTING.md](API_KEY_TROUBLESHOOTING.md) - API key issues and fixes
+- [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Code organization
 - [CLOUDFLARE_CACHE_FIX.md](CLOUDFLARE_CACHE_FIX.md) - Cache troubleshooting
 - [DEV_SETUP.md](DEV_SETUP.md) - Development environment setup
+
+### Quick Commands
+```bash
+npm run check-env    # Check environment configuration
+npm run test-ai      # Test SiliconFlow API connection
+npm run dev          # Start development server
+npm run deploy       # Deploy to Cloudflare
+```
+
 
 ## Project Structure
 
