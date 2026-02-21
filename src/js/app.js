@@ -275,8 +275,8 @@ export class App {
       // Release wake lock
       await this.wakeLock.release();
       
-      // Generate AI summary if enabled
-      await this.ui.showSummary();
+      // Show summary button if enabled
+      this.ui.showSummaryButton();
       
       console.log('[APP STOP] Success');
       

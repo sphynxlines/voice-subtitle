@@ -64,7 +64,7 @@ export const CONFIG = {
   FEATURES: {
     // Enable/disable AI summarization
     // Set to false to disable summary generation
-    ENABLE_SUMMARY: false  // Set to true when SILICONFLOW_API_KEY is configured
+    ENABLE_SUMMARY: true  // Enabled - AI_PROVIDER configured in .dev.vars
   }
 };
 

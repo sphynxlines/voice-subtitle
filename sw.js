@@ -3,7 +3,7 @@
  * Helps maintain permissions and enables offline functionality
  */
 
-const CACHE_NAME = 'voice-subtitle-v17'; // Added SiliconFlow AI summarization
+const CACHE_NAME = 'voice-subtitle-v19'; // Added SiliconFlow AI summarization
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

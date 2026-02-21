@@ -61,14 +61,20 @@ export class UIController {
           text,
           timestamp: Date.now()
         });
+        console.log('[TRANSCRIPT] Added:', { speaker, text, total: this.transcript.length });
       }
     }
   }
 
   /**
-   * Generate and show AI summary
+   * Show summary button
    */
-  async showSummary() {
+  showSummaryButton() {
+    console.log('[SUMMARY BUTTON] Called');
+    console.log('[SUMMARY BUTTON] Feature enabled:', CONFIG.FEATURES.ENABLE_SUMMARY);
+    console.log('[SUMMARY BUTTON] Transcript length:', this.transcript.length);
+    console.log('[SUMMARY BUTTON] Transcript:', this.transcript);
+    
     // Check if feature is enabled
     if (!CONFIG.FEATURES.ENABLE_SUMMARY) {
       console.log('[SUMMARY] Feature disabled in config');
@@ -81,6 +87,50 @@ export class UIController {
       return;
     }
 
+    console.log('[SUMMARY] Showing summary button for', this.transcript.length, 'items');
+
+    // Show summary button
+    this.elements.subtitleText.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+        <div style="font-size: 0.7em; color: #7f8c8d;">
+          对话已结束 (${this.transcript.length} 条记录)
+        </div>
+        <button 
+          id="btnGenerateSummary" 
+          class="summary-button"
+          style="
+            padding: 12px 24px;
+            font-size: 0.6em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+          "
+          onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102, 126, 234, 0.6)';"
+          onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(102, 126, 234, 0.4)';"
+        >
+          📝 生成对话总结
+        </button>
+      </div>
+    `;
+
+    // Add click handler
+    const btn = document.getElementById('btnGenerateSummary');
+    if (btn) {
+      btn.addEventListener('click', () => this.generateSummary());
+      console.log('[SUMMARY BUTTON] Click handler attached');
+    } else {
+      console.error('[SUMMARY BUTTON] Button element not found!');
+    }
+  }
+
+  /**
+   * Generate and show AI summary
+   */
+  async generateSummary() {
     console.log('[SUMMARY] Generating summary for', this.transcript.length, 'items');
 
     // Show loading state
@@ -90,25 +140,82 @@ export class UIController {
     try {
       const summary = await this.aiClient.summarize(this.transcript);
       
-      // Show summary
+      // Show summary with regenerate button
       this.elements.subtitleText.innerHTML = `
-        <div style="font-size: 0.6em; color: #27ae60; margin-bottom: 10px;">📝 对话总结</div>
-        <div style="font-size: 0.7em; line-height: 1.5;">${summary}</div>
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+          <div style="font-size: 0.6em; color: #27ae60; margin-bottom: 5px;">
+            ✨ 对话总结
+          </div>
+          <div style="font-size: 0.7em; line-height: 1.5; text-align: left;">
+            ${summary}
+          </div>
+          <button 
+            id="btnRegenerateSummary" 
+            class="summary-button"
+            style="
+              padding: 8px 16px;
+              font-size: 0.5em;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+              align-self: center;
+            "
+            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 15px rgba(102, 126, 234, 0.5)';"
+            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(102, 126, 234, 0.3)';"
+          >
+            🔄 重新生成
+          </button>
+        </div>
       `;
+      
+      // Add click handler for regenerate button
+      const btn = document.getElementById('btnRegenerateSummary');
+      if (btn) {
+        btn.addEventListener('click', () => this.generateSummary());
+      }
       
       console.log('[SUMMARY] Success');
       
     } catch (error) {
       console.error('[SUMMARY] Failed:', error);
       
-      // Show error briefly, then return to default
-      this.elements.subtitleText.innerHTML = 
-        `<span style="color: #e74c3c;">总结生成失败: ${error.message}</span>`;
+      // Show error with retry button
+      this.elements.subtitleText.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+          <div style="font-size: 0.6em; color: #e74c3c;">
+            ❌ 总结生成失败: ${error.message}
+          </div>
+          <button 
+            id="btnRetrySummary" 
+            class="summary-button"
+            style="
+              padding: 10px 20px;
+              font-size: 0.6em;
+              background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+              color: white;
+              border: none;
+              border-radius: 8px;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+            "
+            onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(231, 76, 60, 0.6)';"
+            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(231, 76, 60, 0.4)';"
+          >
+            🔄 重试
+          </button>
+        </div>
+      `;
       
-      // Return to default after 3 seconds
-      setTimeout(() => {
-        this.elements.subtitleText.textContent = '点击下方按钮开始';
-      }, 3000);
+      // Add click handler for retry button
+      const btn = document.getElementById('btnRetrySummary');
+      if (btn) {
+        btn.addEventListener('click', () => this.generateSummary());
+      }
     }
   }
 
